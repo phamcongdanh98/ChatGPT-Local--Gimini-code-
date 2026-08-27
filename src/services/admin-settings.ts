@@ -19,6 +19,14 @@ export interface AdminSettingsInput {
   autoReconnectTunnel?: boolean | undefined;
 }
 
+export interface RecentWorkspaceItem {
+  name: string;
+  path: string;
+  isCurrent: boolean;
+  exists: boolean;
+  lastOpenedAt: string;
+}
+
 const SETTINGS_KEYS = [
   "WORKSPACE_PATH",
   "EXTRA_WORKSPACE_PATHS",
@@ -127,4 +135,58 @@ export async function persistAdminSettings(
   } finally {
     await fs.rm(temporary, { force: true }).catch(() => undefined);
   }
+}
+
+const RECENT_WORKSPACES_FILE = "recent-workspaces.json";
+
+export async function getRecentWorkspaces(stateDir: string, currentPrimary: string): Promise<RecentWorkspaceItem[]> {
+  const filePath = path.join(stateDir, RECENT_WORKSPACES_FILE);
+  let list: Array<{ path: string; lastOpenedAt: string }> = [];
+  try {
+    const content = await fs.readFile(filePath, "utf8");
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) list = parsed;
+  } catch {}
+
+  if (currentPrimary && !list.some((item) => item.path === currentPrimary)) {
+    list.unshift({ path: currentPrimary, lastOpenedAt: new Date().toISOString() });
+  }
+
+  const items: RecentWorkspaceItem[] = [];
+  for (const entry of list) {
+    let exists = false;
+    try {
+      const stat = await fs.stat(entry.path);
+      exists = stat.isDirectory();
+    } catch {}
+
+    items.push({
+      name: path.basename(entry.path),
+      path: entry.path,
+      isCurrent: entry.path === currentPrimary,
+      exists,
+      lastOpenedAt: entry.lastOpenedAt || new Date().toISOString(),
+    });
+  }
+
+  return items.slice(0, 10);
+}
+
+export async function recordRecentWorkspace(stateDir: string, workspacePath: string): Promise<void> {
+  const filePath = path.join(stateDir, RECENT_WORKSPACES_FILE);
+  let list: Array<{ path: string; lastOpenedAt: string }> = [];
+  try {
+    const content = await fs.readFile(filePath, "utf8");
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) list = parsed;
+  } catch {}
+
+  list = list.filter((item) => item.path !== workspacePath);
+  list.unshift({ path: workspacePath, lastOpenedAt: new Date().toISOString() });
+  list = list.slice(0, 10);
+
+  try {
+    await fs.mkdir(stateDir, { recursive: true, mode: 0o700 });
+    await fs.writeFile(filePath, JSON.stringify(list, null, 2), { encoding: "utf8", mode: 0o600 });
+  } catch {}
 }

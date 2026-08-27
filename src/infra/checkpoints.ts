@@ -25,6 +25,20 @@ export interface CheckpointSummary {
   files: string[];
 }
 
+export interface CheckpointDiffResult {
+  id: string;
+  action: string;
+  createdAt: string;
+  files: Array<{
+    path: string;
+    label: string;
+    existedBefore: boolean;
+    existsNow: boolean;
+    beforeContent: string;
+    currentContent: string;
+  }>;
+}
+
 async function pathExists(value: string): Promise<boolean> {
   try {
     await fs.lstat(value);
@@ -150,6 +164,46 @@ export class CheckpointStore {
       createdAt: metadata.createdAt,
       action: metadata.action,
       files: metadata.files.map((file) => file.label),
+    };
+  }
+
+  async getDiff(id: string): Promise<CheckpointDiffResult> {
+    if (!/^[a-z0-9-]+$/i.test(id)) throw new Error("Invalid checkpoint id");
+    const metadata = await this.readMetadata(id);
+    const directory = path.join(this.checkpointDir, id);
+    const filesDiff: CheckpointDiffResult["files"] = [];
+
+    for (const file of metadata.files) {
+      let beforeContent = "";
+      if (file.existed && file.snapshot) {
+        const source = path.resolve(directory, file.snapshot);
+        try {
+          beforeContent = await fs.readFile(source, "utf8");
+        } catch {}
+      }
+
+      let currentContent = "";
+      let existsNow = false;
+      try {
+        currentContent = await fs.readFile(file.path, "utf8");
+        existsNow = true;
+      } catch {}
+
+      filesDiff.push({
+        path: file.path,
+        label: file.label,
+        existedBefore: file.existed,
+        existsNow,
+        beforeContent,
+        currentContent,
+      });
+    }
+
+    return {
+      id: metadata.id,
+      action: metadata.action,
+      createdAt: metadata.createdAt,
+      files: filesDiff,
     };
   }
 

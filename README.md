@@ -4,6 +4,17 @@ MCP server local, giới hạn quyền, cho phép ChatGPT hoặc MCP client đ�
 
 Đây là bản dựng mới từ những phần tốt của `ChatGPT-Local`: giữ PathPolicy, checkpoint, capability gating, dashboard localhost và audit metadata; đồng thời siết chặt workspace, process/session limits, launcher đa nền tảng và luồng kết nối ChatGPT.
 
+## 🚀 6 Tính năng Nâng cấp Mới
+
+| Tính năng | Mô tả chi tiết |
+| :--- | :--- |
+| 🗂️ **Recent Projects Switcher** | Lưu lịch sử các project đã mở, chuyển đổi nhanh 1-click ngay trên thanh Project Dashboard. |
+| 🛡️ **Visual Diff & 1-Click Rollback** | Xem chi tiết code ChatGPT đã thêm (xanh) / xóa (đỏ) qua từng Checkpoint và hoàn tác an toàn 1-click. |
+| 🍏 **macOS Menu Bar Tray App** | Menu thu nhỏ tiện lợi trên thanh trạng thái macOS (Menu Bar) với icon Shield 3D và quick actions. |
+| ⚡ **Auto-Detect Project Tasks** | Tự động quét cấu trúc dự án (Node.js, Python, Cargo/Rust, Go, Git) và gợi ý task để thêm vào Allowlist. |
+| 📡 **Realtime Activity Stream (SSE)** | Luồng Server-Sent Events `/api/events` cập nhật realtime và hiển thị Toast thông báo khi AI thao tác. |
+| 🌐 **Smart Path Resolution** | Phân giải đường dẫn thông minh, hỗ trợ cả đường dẫn tương đối, tên thư mục và alias root. |
+
 ## Điểm khác biệt chính
 
 - `WORKSPACE_PATH` bắt buộc là đường dẫn tuyệt đối tới một project cụ thể; root ổ đĩa, Home, root chồng lấn và symlink thoát workspace đều bị chặn.

@@ -7,7 +7,8 @@ import { APP_NAME, APP_VERSION, publicConfig } from "../config.js";
 import type { AuditLog } from "../infra/audit.js";
 import type { CheckpointStore } from "../infra/checkpoints.js";
 import type { AdminSettingsInput } from "../services/admin-settings.js";
-import { parseAdminSettings } from "../services/admin-settings.js";
+import { canonicalWorkspace, getRecentWorkspaces, parseAdminSettings, recordRecentWorkspace } from "../services/admin-settings.js";
+import { detectProjectTaskPresets } from "../services/task-presets.js";
 import { pickWorkspaceFolder } from "../services/folder-picker.js";
 import type { TaskRunner } from "../services/task-runner.js";
 import type { TunnelManager } from "../services/tunnel-manager.js";
@@ -381,12 +382,114 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
   app.get("/api/tasks", asyncRoute(async (_request, response) => {
     response.json({ tasks: await dependencies.tasks().list() });
   }));
+  app.get("/api/tasks/presets", asyncRoute(async (_request, response) => {
+    const config = dependencies.config();
+    const presets = await detectProjectTaskPresets(config.primaryRoot);
+    response.json({ presets });
+  }));
   app.get("/api/checkpoints", asyncRoute(async (_request, response) => {
     response.json({ checkpoints: await dependencies.checkpoints().list() });
   }));
+  app.get("/api/checkpoints/:id/diff", asyncRoute(async (request, response) => {
+    const id = request.params.id as string;
+    try {
+      const diff = await dependencies.checkpoints().getDiff(id);
+      response.json(diff);
+    } catch (error) {
+      response.status(404).json({ error: error instanceof Error ? error.message : "Không tìm thấy checkpoint" });
+    }
+  }));
+  app.get("/api/workspaces/recent", asyncRoute(async (_request, response) => {
+    const config = dependencies.config();
+    const list = await getRecentWorkspaces(config.stateDir, config.primaryRoot);
+    response.json({ workspaces: list });
+  }));
   app.get("/api/audit", (_request, response) => response.json({ events: dependencies.audit().recent(100) }));
 
+  app.get("/api/events", (request, response) => {
+    response.setHeader("Content-Type", "text/event-stream");
+    response.setHeader("Cache-Control", "no-cache");
+    response.setHeader("Connection", "keep-alive");
+    response.flushHeaders();
+
+    const onEvent = (event: unknown) => {
+      response.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    const audit = dependencies.audit();
+    audit.on("event", onEvent);
+
+    request.on("close", () => {
+      audit.off("event", onEvent);
+    });
+  });
+
   const json = express.json({ limit: 16 * 1024, strict: true });
+  app.post("/api/workspaces/select", requireAdminAction, json, asyncRoute(async (request, response) => {
+    const targetPath = typeof request.body?.path === "string" ? request.body.path.trim() : "";
+    if (!targetPath) {
+      response.status(400).json({ error: "Đường dẫn không hợp lệ" });
+      return;
+    }
+    const current = dependencies.config();
+    try {
+      const canonical = await canonicalWorkspace(targetPath);
+      const updated = await dependencies.updateSettings({
+        workspacePath: canonical,
+        permissionMode: current.permissionMode,
+        allowDestructive: current.allowDestructive,
+        allowRemoteGit: current.allowRemoteGit,
+        allowUnsafeShell: current.allowUnsafeShell,
+        allowSensitiveFiles: current.allowSensitiveFiles,
+        tunnelProvider: current.tunnelProvider,
+        cloudflareTunnelToken: current.cloudflareTunnelToken,
+        ngrokAuthToken: current.ngrokAuthToken,
+        ngrokDomain: current.ngrokDomain,
+        persistentTunnelDomain: current.persistentTunnelDomain,
+        autoReconnectTunnel: current.autoReconnectTunnel,
+      });
+      await recordRecentWorkspace(current.stateDir, canonical);
+      response.json({ ok: true, settings: settingsPayload(updated), sessionsReset: true });
+    } catch (error) {
+      response.status(400).json({ error: error instanceof Error ? error.message : "Không thể chọn workspace" });
+    }
+  }));
+
+  app.post("/api/checkpoints/:id/restore", requireAdminAction, asyncRoute(async (request, response) => {
+    const id = request.params.id as string;
+    try {
+      const restored = await dependencies.checkpoints().restore(id);
+      await dependencies.audit().record({
+        tool: "admin_restore",
+        action: "restore_checkpoint",
+        outcome: "ok",
+        target: id,
+      });
+      response.json({ ok: true, restored });
+    } catch (error) {
+      response.status(400).json({ error: error instanceof Error ? error.message : "Không thể khôi phục checkpoint" });
+    }
+  }));
+
+  app.post("/api/tasks/enable-preset", requireAdminAction, json, asyncRoute(async (request, response) => {
+    const taskName = typeof request.body?.name === "string" ? request.body.name : "";
+    const command = typeof request.body?.command === "string" ? request.body.command : "";
+    const args = Array.isArray(request.body?.args) ? (request.body.args as string[]) : [];
+    if (!taskName || !command) {
+      response.status(400).json({ error: "Thông tin task không hợp lệ" });
+      return;
+    }
+    const config = dependencies.config();
+    const tasksFile = path.join(config.stateDir, "tasks.json");
+    let currentTasks: Record<string, { program: string; args: string[]; cwd?: string }> = {};
+    try {
+      currentTasks = JSON.parse(await fs.promises.readFile(tasksFile, "utf8"));
+    } catch {}
+    currentTasks[taskName] = { program: command, args };
+    await fs.promises.mkdir(config.stateDir, { recursive: true, mode: 0o700 });
+    await fs.promises.writeFile(tasksFile, JSON.stringify(currentTasks, null, 2), { encoding: "utf8", mode: 0o600 });
+    response.json({ ok: true, tasks: await dependencies.tasks().list() });
+  }));
   app.post("/api/secret", requireAdminAction, (_request, response) => {
     const tunnel = dependencies.tunnel.status();
     const token = dependencies.config().token;

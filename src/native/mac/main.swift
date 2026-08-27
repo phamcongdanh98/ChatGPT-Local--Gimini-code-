@@ -4,7 +4,9 @@ import WebKit
 class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
     var window: NSWindow!
     var webView: WKWebView!
+    var statusItem: NSStatusItem!
     var parentPid: pid_t = 0
+    var targetUrlString: String = "http://127.0.0.1:3301/ui"
 
     func setupMainMenu() {
         let mainMenu = NSMenu()
@@ -45,6 +47,54 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         mainMenu.addItem(windowMenuItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    func setupStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem.button {
+            if let iconUrl = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+               let img = NSImage(contentsOf: iconUrl) {
+                img.size = NSSize(width: 18, height: 18)
+                button.image = img
+            } else if let img = NSImage(contentsOfFile: "src/assets/logo.png") {
+                img.size = NSSize(width: 18, height: 18)
+                button.image = img
+            } else {
+                button.title = "🛡️"
+            }
+        }
+
+        let menu = NSMenu()
+        let statusTitle = NSMenuItem(title: "🟢 Local Secure: Đang chạy", action: nil, keyEquivalent: "")
+        statusTitle.isEnabled = false
+        menu.addItem(statusTitle)
+        menu.addItem(NSMenuItem.separator())
+
+        menu.addItem(withTitle: "Hiện / Ẩn Dashboard", action: #selector(toggleMainWindow), keyEquivalent: "d")
+        menu.addItem(withTitle: "Sao chép URL Dashboard", action: #selector(copyDashboardUrl), keyEquivalent: "c")
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: "Thoát Local Secure", action: #selector(terminateApp), keyEquivalent: "q")
+
+        statusItem.menu = menu
+    }
+
+    @objc func toggleMainWindow() {
+        if window.isVisible {
+            window.orderOut(nil)
+        } else {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    @objc func copyDashboardUrl() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(targetUrlString, forType: .string)
+    }
+
+    @objc func terminateApp() {
+        NSApplication.shared.terminate(nil)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -94,6 +144,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         if CommandLine.arguments.count > 2, let pid = Int32(CommandLine.arguments[2]) {
             parentPid = pid
         }
+        targetUrlString = targetUrl
+        setupStatusItem()
 
         if let url = URL(string: targetUrl) {
             webView.load(URLRequest(url: url))

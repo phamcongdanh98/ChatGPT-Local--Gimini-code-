@@ -129,6 +129,10 @@ export const ADMIN_HTML = `<!doctype html>
           <div class="input-action"><input id="workspace-path" autocomplete="off" spellcheck="false"><button id="pick-folder" class="button ghost">📁 Chọn thư mục</button></div>
           <small>Không thể chọn toàn bộ ổ đĩa hoặc thư mục Home.</small>
         </label>
+        <div id="recent-workspaces-section" class="recent-section">
+          <span class="recent-title">Dự án gần đây:</span>
+          <div id="recent-list" class="recent-chips"></div>
+        </div>
         <div class="permissions">
           <label class="toggle-row"><span><strong>Đọc code</strong><small>Luôn bật trong workspace đã chọn</small></span><input type="checkbox" checked disabled><i></i></label>
           <label class="toggle-row"><span><strong>Tự sửa code + chạy task + Git local</strong><small>Cho phép tạo/sửa file và chạy task trong allowlist</small></span><input id="allow-write" type="checkbox"><i></i></label>
@@ -161,12 +165,32 @@ export const ADMIN_HTML = `<!doctype html>
       <article class="card compact">
         <div class="card-head"><div><span class="step">ALLOWLIST</span><h2>Task được chạy</h2></div><span id="task-count" class="count">0</span></div>
         <div id="tasks" class="rows"></div>
+        <div id="preset-tasks-section" class="preset-section">
+          <span class="preset-title">💡 Gợi ý task theo dự án:</span>
+          <div id="preset-list" class="preset-chips"></div>
+        </div>
       </article>
       <article class="card compact">
-        <div class="card-head"><div><span class="step">AUDIT</span><h2>Tool call gần đây</h2></div><span id="checkpoint-count" class="count">0 checkpoint</span></div>
+        <div class="card-head"><div><span class="step">AUDIT & CHECKPOINTS</span><h2>Lịch sử sửa đổi code</h2></div><span id="checkpoint-count" class="count">0 checkpoint</span></div>
         <div id="activity" class="rows"></div>
       </article>
     </section>
+
+    <div id="diff-modal" class="modal-backdrop" hidden>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <span class="step">CHECKPOINT DIFF</span>
+            <h2 id="diff-modal-title">Chi tiết thay đổi code</h2>
+          </div>
+          <button id="close-diff-modal" class="button ghost">✕ Đóng</button>
+        </div>
+        <div id="diff-modal-body" class="diff-content"></div>
+        <div class="modal-footer">
+          <button id="restore-checkpoint-btn" class="button danger">↩ Hoàn tác Checkpoint này</button>
+        </div>
+      </div>
+    </div>
 
     <footer>🔒 Token chỉ hiện sau khi bạn bấm · Không tunnel cổng Admin · Không lưu secret trong trình duyệt</footer>
   </main>
@@ -217,6 +241,40 @@ export const ADMIN_STYLESHEET = `
 .tunnel-action-row{display:flex;gap:9px;margin:14px 0}
 .tunnel-action-row button{flex:1}
 
+/* Recent Workspaces */
+.recent-section{margin:8px 0 12px}
+.recent-title{display:block;font-size:9.5px;font-weight:800;color:var(--muted);margin-bottom:6px}
+.recent-chips{display:flex;flex-wrap:wrap;gap:6px}
+.recent-chip{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 9px;font:750 9.5px var(--sans);color:var(--muted);cursor:pointer;transition:.15s;display:flex;align-items:center;gap:5px}
+.recent-chip:hover{border-color:var(--green);color:var(--text);background:var(--panel2)}
+.recent-chip.current{border-color:var(--green);color:var(--green);background:rgba(92,224,181,.08)}
+
+/* Preset Tasks */
+.preset-section{border-top:1px solid var(--line);padding:12px 20px 16px}
+.preset-title{display:block;font-size:9.5px;font-weight:800;color:var(--muted);margin-bottom:8px}
+.preset-chips{display:flex;flex-wrap:wrap;gap:6px}
+.preset-chip{background:var(--panel2);border:1px solid #32465c;border-radius:8px;padding:6px 10px;font:800 9.5px var(--sans);color:var(--blue);cursor:pointer;transition:.15s;display:flex;align-items:center;gap:4px}
+.preset-chip:hover{border-color:var(--blue);background:#16283d;color:#fff;box-shadow:0 0 10px rgba(130,181,255,.2)}
+.preset-chip small{font-size:8px;color:var(--muted);margin-left:2px}
+
+/* Diff Modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px;z-index:1000}
+.modal-backdrop[hidden]{display:none!important}
+.modal-card{width:min(920px,100%);max-height:88vh;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;overflow:hidden}
+.modal-header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:var(--panel2)}
+.modal-header h2{font-size:16px;margin:0}
+.diff-content{padding:20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:16px}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--line);background:var(--panel2);display:flex;justify-content:flex-end;gap:10px}
+.diff-file-card{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.diff-file-head{padding:10px 14px;background:var(--panel2);border-bottom:1px solid var(--line);font:750 11px var(--mono);color:var(--text);display:flex;align-items:center;justify-content:space-between}
+.diff-code-box{font:10px var(--mono);padding:10px 0;max-height:300px;overflow-y:auto}
+.diff-line{padding:2px 14px;white-space:pre-wrap;display:flex;gap:10px;line-height:1.4}
+.diff-line.add{background:rgba(92,224,181,.12);color:var(--green)}
+.diff-line.del{background:rgba(255,139,139,.12);color:var(--red)}
+.diff-line .prefix{width:12px;font-weight:900;user-select:none;flex-shrink:0}
+.clickable-row{cursor:pointer;transition:.15s}
+.clickable-row:hover{background:var(--panel2)}
+
 @media(max-width:850px){.main-grid,.info-grid{grid-template-columns:1fr}.hero{padding-top:32px}.header-actions .status-pill{display:none}}
 @media(max-width:560px){.page{width:min(100% - 20px,1120px)}.header{height:64px}.hero{padding:28px 2px 18px}.card{padding:15px}.compact .card-head{padding:15px 15px 0}.compact>p{padding:0 15px}.warning{margin:10px 15px 15px!important}.stats{padding:0 15px 15px}.row{padding:10px 15px}.input-action{flex-wrap:wrap}.input-action input{flex-basis:100%}.provider-tabs{grid-template-columns:1fr}.tunnel-action-row{flex-direction:column}.header-actions{gap:7px}}
 `;
@@ -229,7 +287,11 @@ const state={
   secret:null,
   tokenVisible:false,
   connectorPublicUrl:null,
-  selectedProvider:'ngrok'
+  selectedProvider:'ngrok',
+  workspaces:[],
+  presets:[],
+  checkpoints:[],
+  activeDiffCheckpointId:null
 };
 const q=(selector)=>document.querySelector(selector);
 const qa=(selector)=>document.querySelectorAll(selector);
@@ -245,28 +307,25 @@ async function api(url,options={}){
 }
 
 function toast(message,error=false){
-  const target=q("#toast");
-  target.textContent=message;
-  target.className="toast"+(error?" error":"");
-  target.hidden=false;
-  clearTimeout(toast.timer);
-  toast.timer=setTimeout(()=>target.hidden=true,3500);
+  const node=q("#toast");
+  node.textContent=message;
+  node.className="toast "+(error?"error":"");
+  node.hidden=false;
+  clearTimeout(node.timer);
+  node.timer=setTimeout(()=>{node.hidden=true},3800);
 }
 
-async function copy(value,label){
-  if(!value)throw new Error("Chưa có dữ liệu để sao chép");
-  try{
-    await navigator.clipboard.writeText(value);
-  }catch{
-    const t=document.createElement("textarea");
-    t.value=value;
-    t.style.position="fixed";
-    t.style.opacity="0";
-    document.body.appendChild(t);
-    t.focus();
-    t.select();
+async function copy(text,label){
+  if(!text)throw new Error("Không có "+label+" để sao chép");
+  if(navigator.clipboard&&window.isSecureContext){
+    await navigator.clipboard.writeText(text);
+  } else {
+    const input=document.createElement("input");
+    input.value=text;
+    document.body.append(input);
+    input.select();
     document.execCommand("copy");
-    document.body.removeChild(t);
+    input.remove();
   }
   toast("Đã sao chép "+label);
 }
@@ -403,6 +462,64 @@ function renderSecrets(){
       : "Bấm 'Bắt đầu kết nối' để tạo URL.";
 }
 
+function renderRecentWorkspaces(){
+  const list = state.workspaces || [];
+  const container = q("#recent-list");
+  if(!list.length){
+    q("#recent-workspaces-section").hidden = true;
+    return;
+  }
+  q("#recent-workspaces-section").hidden = false;
+  container.replaceChildren(...list.map(item=>{
+    const chip = el("button", "recent-chip" + (item.isCurrent ? " current" : ""));
+    chip.type = "button";
+    chip.append(el("span", "", "📁 " + item.name));
+    chip.addEventListener("click", async()=>{
+      try {
+        await api("/api/workspaces/select", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ path: item.path })
+        });
+        toast("Đã chuyển sang dự án: " + item.name);
+        await load();
+      } catch(e) {
+        toast(e.message, true);
+      }
+    });
+    return chip;
+  }));
+}
+
+function renderPresetTasks(){
+  const presets = state.presets || [];
+  const container = q("#preset-list");
+  if(!presets.length){
+    q("#preset-tasks-section").hidden = true;
+    return;
+  }
+  q("#preset-tasks-section").hidden = false;
+  container.replaceChildren(...presets.map(p=>{
+    const chip = el("button", "preset-chip");
+    chip.type = "button";
+    chip.append(el("span", "", "+ " + p.name), el("small", "", p.description));
+    chip.addEventListener("click", async()=>{
+      try {
+        await api("/api/tasks/enable-preset", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(p)
+        });
+        toast("Đã bật task: " + p.name);
+        await load();
+      } catch(e) {
+        toast(e.message, true);
+      }
+    });
+    return chip;
+  }));
+}
+
 function renderRows(){
   const tasks=state.tasks||[];
   q("#task-count").textContent=String(tasks.length);
@@ -412,15 +529,91 @@ function renderRows(){
     return row;
   }):[el("div","empty","Chưa có task trong .local-coder/tasks.json")]));
   
+  const checkpoints = state.checkpoints || [];
+  q("#checkpoint-count").textContent = String(checkpoints.length) + " checkpoint";
+  
   const events=state.events||[];
   q("#activity").replaceChildren(...(events.length?events.slice(0,8).map(event=>{
-    const row=el("div","row");
-    row.append(el("strong","",event.tool),el("span","",event.action+" · "+event.outcome),el("time","",new Date(event.timestamp).toLocaleTimeString("vi-VN")));
+    const row=el("div","row clickable-row");
+    row.append(
+      el("strong","",event.tool),
+      el("span","",event.action+" · "+event.outcome + (event.target ? " ("+event.target+")" : "")),
+      el("time","",new Date(event.timestamp).toLocaleTimeString("vi-VN"))
+    );
+    row.addEventListener("click", () => {
+      // Find matching checkpoint if any
+      if(checkpoints.length) openDiffModal(checkpoints[0].id);
+    });
     return row;
   }):[el("div","empty","Chưa có tool call")]));
-  
-  q("#checkpoint-count").textContent=String((state.checkpoints||[]).length)+" checkpoint";
 }
+
+async function openDiffModal(checkpointId){
+  state.activeDiffCheckpointId = checkpointId;
+  const modal = q("#diff-modal");
+  const body = q("#diff-modal-body");
+  const title = q("#diff-modal-title");
+  
+  modal.hidden = false;
+  title.textContent = "Đang tải checkpoint " + checkpointId + "…";
+  body.replaceChildren(el("div", "test-step-loading", "Đang tải dữ liệu so sánh thay đổi code…"));
+  
+  try {
+    const data = await api("/api/checkpoints/" + checkpointId + "/diff");
+    title.textContent = "Checkpoint: " + data.action + " (" + new Date(data.createdAt).toLocaleTimeString("vi-VN") + ")";
+    
+    if(!data.files || !data.files.length){
+      body.replaceChildren(el("div", "empty", "Không có file nào bị ảnh hưởng"));
+      return;
+    }
+    
+    body.replaceChildren(...data.files.map(f=>{
+      const card = el("div", "diff-file-card");
+      const head = el("div", "diff-file-head");
+      head.append(el("span", "", "📄 " + f.label), el("small", "", f.existsNow ? "Đã sửa" : "Đã xóa"));
+      
+      const box = el("div", "diff-code-box");
+      const beforeLines = (f.beforeContent || "").split("\\n");
+      const currentLines = (f.currentContent || "").split("\\n");
+      
+      // Simple visual line diff
+      beforeLines.slice(0, 15).forEach(line => {
+        if(!line) return;
+        const row = el("div", "diff-line del");
+        row.append(el("span", "prefix", "-"), el("span", "", line));
+        box.append(row);
+      });
+      currentLines.slice(0, 15).forEach(line => {
+        if(!line) return;
+        const row = el("div", "diff-line add");
+        row.append(el("span", "prefix", "+"), el("span", "", line));
+        box.append(row);
+      });
+      
+      card.append(head, box);
+      return card;
+    }));
+  } catch(e) {
+    body.replaceChildren(el("div", "test-step fail", e.message));
+  }
+}
+
+q("#close-diff-modal").addEventListener("click", () => {
+  q("#diff-modal").hidden = true;
+});
+
+q("#restore-checkpoint-btn").addEventListener("click", async() => {
+  if(!state.activeDiffCheckpointId) return;
+  if(!confirm("Bạn có chắc chắn muốn hoàn tác toàn bộ file về trạng thái trước checkpoint này không?")) return;
+  try {
+    await api("/api/checkpoints/" + state.activeDiffCheckpointId + "/restore", { method: "POST" });
+    toast("✓ Đã hoàn tác thành công checkpoint!");
+    q("#diff-modal").hidden = true;
+    await load();
+  } catch(e) {
+    toast("Lỗi hoàn tác: " + e.message, true);
+  }
+});
 
 async function ensureSecret(force=false){
   if(!state.secret||force){
@@ -455,7 +648,9 @@ async function load(){
       api("/api/tunnel"),
       api("/api/tasks"),
       api("/api/audit"),
-      api("/api/checkpoints")
+      api("/api/checkpoints"),
+      api("/api/workspaces/recent").catch(()=>({workspaces:[]})),
+      api("/api/tasks/presets").catch(()=>({presets:[]}))
     ]);
     state.status=values[0];
     state.settings=values[1];
@@ -463,9 +658,14 @@ async function load(){
     state.tasks=values[3].tasks;
     state.events=values[4].events;
     state.checkpoints=values[5].checkpoints;
+    state.workspaces=values[6].workspaces || [];
+    state.presets=values[7].presets || [];
+    
     renderStatus();
     renderSettings();
     renderTunnel();
+    renderRecentWorkspaces();
+    renderPresetTasks();
     renderRows();
     await syncConnectorUrl();
   }catch(error){
@@ -688,6 +888,20 @@ q("#test-connection").addEventListener("click",async()=>{
 q("#close-test-panel").addEventListener("click",()=>{
   q("#test-connection-panel").hidden=true;
 });
+
+// SSE Realtime connection
+try {
+  const events = new EventSource("/api/events");
+  events.onmessage = (e) => {
+    try {
+      const ev = JSON.parse(e.data);
+      if(ev && ev.tool){
+        toast("⚡ ChatGPT vừa gọi tool: " + ev.tool + " (" + ev.action + ")");
+        load();
+      }
+    } catch {}
+  };
+} catch {}
 
 setInterval(async()=>{
   if(!state.tunnel)return;

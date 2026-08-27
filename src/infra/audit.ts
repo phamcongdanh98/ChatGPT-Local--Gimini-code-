@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { EventEmitter } from "node:events";
 
 export interface AuditEvent {
   id: string;
@@ -13,7 +14,7 @@ export interface AuditEvent {
   detail?: Record<string, string | number | boolean | null>;
 }
 
-export class AuditLog {
+export class AuditLog extends EventEmitter {
   private readonly events: AuditEvent[] = [];
   private readonly filePath: string;
   private readonly maxEvents: number;
@@ -21,6 +22,7 @@ export class AuditLog {
   private writeQueue = Promise.resolve();
 
   constructor(stateDir: string, maxEvents = 250, maxBytes = 5 * 1024 * 1024) {
+    super();
     this.filePath = path.join(stateDir, "audit.jsonl");
     this.maxEvents = maxEvents;
     this.maxBytes = maxBytes;
@@ -58,6 +60,7 @@ export class AuditLog {
     };
     this.events.push(event);
     if (this.events.length > this.maxEvents) this.events.shift();
+    this.emit("event", event);
     const line = `${JSON.stringify(event)}\n`;
     const write = this.writeQueue.then(async () => {
       const stat = await fs.stat(this.filePath);
