@@ -175,6 +175,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         targetUrlString = targetUrl
         setupStatusItem()
 
+        if parentPid > 0 {
+            let pidSource = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .background))
+            pidSource.schedule(deadline: .now() + .seconds(1), repeating: .milliseconds(400))
+            pidSource.setEventHandler { [weak self] in
+                guard let self = self else { return }
+                if kill(self.parentPid, 0) != 0 {
+                    pidSource.cancel()
+                    DispatchQueue.main.async {
+                        NSApplication.shared.terminate(nil)
+                    }
+                }
+            }
+            pidSource.resume()
+        }
+
         if let url = URL(string: targetUrl) {
             webView.load(URLRequest(url: url))
         }

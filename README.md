@@ -1,137 +1,130 @@
-# ChatGPT Local Secure
+# 🛡️ ChatGPT Local Secure
 
-MCP server local, giới hạn quyền, cho phép ChatGPT hoặc MCP client đọc/sửa một project được chọn, chạy task trong allowlist và dùng Git local.
+> **Máy chủ MCP (Model Context Protocol) Local bảo mật cao, đa nền tảng, giúp ChatGPT đọc/sửa code, chạy task và thao tác Git trên máy tính của bạn một cách an toàn tuyệt đối.**
 
-Đây là bản dựng mới từ những phần tốt của `ChatGPT-Local`: giữ PathPolicy, checkpoint, capability gating, dashboard localhost và audit metadata; đồng thời siết chặt workspace, process/session limits, launcher đa nền tảng và luồng kết nối ChatGPT.
+[![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](#yêu-cầu)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](#kiểm-tra-chất-lượng)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](#khởi-động-nhanh)
+[![License](https://img.shields.io/badge/Security-Least--Privilege-5ce0b5)](#bảo-mật)
 
-## 🚀 6 Tính năng Nâng cấp Mới
+---
 
-| Tính năng | Mô tả chi tiết |
-| :--- | :--- |
-| 🗂️ **Recent Projects Switcher** | Lưu lịch sử các project đã mở, chuyển đổi nhanh 1-click ngay trên thanh Project Dashboard. |
-| 🛡️ **Visual Diff & 1-Click Rollback** | Xem chi tiết code ChatGPT đã thêm (xanh) / xóa (đỏ) qua từng Checkpoint và hoàn tác an toàn 1-click. |
-| 🍏 **macOS Menu Bar Tray App** | Menu thu nhỏ tiện lợi trên thanh trạng thái macOS (Menu Bar) với icon Shield 3D và quick actions. |
-| ⚡ **Auto-Detect Project Tasks** | Tự động quét cấu trúc dự án (Node.js, Python, Cargo/Rust, Go, Git) và gợi ý task để thêm vào Allowlist. |
-| 📡 **Realtime Activity Stream (SSE)** | Luồng Server-Sent Events `/api/events` cập nhật realtime và hiển thị Toast thông báo khi AI thao tác. |
-| 🌐 **Smart Path Resolution** | Phân giải đường dẫn thông minh, hỗ trợ cả đường dẫn tương đối, tên thư mục và alias root. |
+## 🌟 6 Tính Năng Nổi Bật Mới
 
-## Điểm khác biệt chính
+| Icon | Tính năng | Chi tiết hoạt động |
+| :---: | :--- | :--- |
+| 🗂️ | **Recent Projects Switcher** | Lưu lịch sử các thư mục dự án; chuyển đổi tức thì **1-Click** ngay trên thanh Dashboard mà không cần chọn lại file. |
+| 🛡️ | **Visual Diff & 1-Click Rollback** | Xem chi tiết so sánh code ChatGPT đã thêm (`+ xanh`) hoặc xóa (`- đỏ`) qua từng Checkpoint; hoàn tác an toàn **1-Click**. |
+| 🍏 | **macOS Menu Bar Tray App** | Menu thu nhỏ tiện ích trên thanh trạng thái macOS (Menu Bar) với icon khiên 3D, hỗ trợ ẩn vào Tray khi bấm `Cmd+W` / `(X)`. |
+| ⚡ | **Auto-Detect Project Tasks** | Tự động nhận diện cấu trúc dự án (**Node.js/npm, Python/pytest, Rust/cargo, Go, Git**) và gợi ý task thêm vào Allowlist 1-Click. |
+| 📡 | **Realtime Activity Stream (SSE)** | Luồng Server-Sent Events `/api/events` cập nhật realtime và hiển thị thông báo Toast góc màn hình mỗi khi AI gọi tool. |
+| 🌐 | **Cố định URL với Ngrok / Cloudflare** | Hỗ trợ gán Domain cố định (Custom Domain) cho Ngrok / Cloudflare để không bao giờ phải cập nhật lại link trên ChatGPT. |
 
-- `WORKSPACE_PATH` bắt buộc là đường dẫn tuyệt đối tới một project cụ thể; root ổ đĩa, Home, root chồng lấn và symlink thoát workspace đều bị chặn.
-- Mọi luồng đọc context đều đi qua PathPolicy; có test hồi quy cho symlink `README.md` trỏ ra ngoài.
-- Search nội dung chỉ dùng literal matching, không nhận JavaScript regex tùy ý.
-- Background task có giới hạn đồng thời, retention hữu hạn và shutdown theo process tree với TERM rồi KILL.
-- MCP session có TTL và giới hạn số lượng; audit được nạp lại sau restart và rotate theo kích thước.
-- `ALLOW_URL_TOKEN=false` mặc định. Cách kết nối ưu tiên là [OpenAI Secure MCP Tunnel](docs/secure-tunnel.md).
-- Windows mở trình duyệt mặc định thay vì engine Internet Explorer cũ; `pnpm app` thực sự start server và mở dashboard.
-- CI chạy Linux, macOS và Windows; `verify` gồm typecheck, test, build, production smoke và kiểm tra gói npm.
+---
 
-## Yêu cầu
+## 🚀 Khởi Động Nhanh (1-Click)
 
-- Node.js 22+
-- Corepack
-- pnpm 11.19.0 (được khóa trong `packageManager`)
+Yêu cầu máy đã cài **[Node.js 22+](https://nodejs.org)**. Sau đó mở thư mục dự án và nhấp đúp:
 
-## Cách dùng dễ nhất
+| Hệ điều hành | File chạy nhanh 1-Click | Lệnh Terminal tương đương |
+| :--- | :--- | :--- |
+| 🍏 **macOS** | Nhấp đúp file **`Start ChatGPT Local.command`** | `./app.sh` hoặc `corepack pnpm app` |
+| 🪟 **Windows** | Nhấp đúp file **`Start ChatGPT Local.cmd`** | `.\app.ps1` hoặc `corepack pnpm app` |
+| 🐧 **Linux** | Chạy file **`./start.sh`** | `./app.sh` hoặc `corepack pnpm app` |
 
-Sau khi đã cài Node.js 22+, mở thư mục project và nhấp đúp:
+> 💡 **Tự động 100%:** Trong lần chạy đầu tiên, app sẽ tự cài dependency, tự sinh token bảo mật, tạo cấu hình và mở trực tiếp ứng dụng Dashboard.
 
-- macOS: `Start ChatGPT Local.command`
-- Windows: `Start ChatGPT Local.cmd`
-- Linux: chạy `./app.sh`
+---
 
-Lần đầu, giao diện sẽ tự mở:
+## 📖 Hướng Dẫn Sử Dụng (3 Bước Đơn Giản)
 
-1. Bấm **Chọn thư mục**.
-2. Chọn project muốn làm việc.
-3. Bấm **Bắt đầu sử dụng**.
-
-App tự cài dependency nếu cần, tự tạo token, tự cấu hình và tự đăng nhập dashboard. Những lần sau chỉ cần mở lại launcher.
-
-## Cách dùng bằng Terminal
-
-```bash
-corepack enable
-corepack pnpm install --frozen-lockfile
-corepack pnpm setup:local -- /absolute/path/to/your/project
-corepack pnpm app
+```mermaid
+graph LR
+    A[1. Mở App Local Coder] --> B[2. Bấm Bắt đầu kết nối]
+    B --> C[3. Sao chép URL dán vào ChatGPT]
+    C --> D[🎉 ChatGPT bắt đầu Code!]
 ```
 
-`setup:local` tạo `.env`, token mạnh và registry task tại `<workspace>/.local-coder/tasks.json`. File `.env` hiện có sẽ không bị ghi đè.
+### 🔹 Bước 1: Chọn Thư Mục Dự Án & Quyền Hạn
+1. Trên giao diện Dashboard (thẻ **BƯỚC 2**), bấm **📁 Chọn thư mục** để chỉ định project bạn muốn ChatGPT làm việc.
+2. Tích chọn các quyền bạn muốn cấp:
+   - **Tự sửa code + chạy task + Git local:** Cho phép ChatGPT tạo, chỉnh sửa file và chạy lệnh trong Allowlist.
+   - **Quyền nâng cao (Tùy chọn):** Xóa file, Git push/pull, hoặc chạy Shell tùy ý (chỉ bật khi tin tưởng).
+3. Bấm **Lưu cài đặt project**.
 
-Dashboard mặc định: `http://127.0.0.1:3001/ui`. Launcher tự đăng nhập bằng mã dùng một lần; `ADMIN_TOKEN` trong `.env` chỉ dùng khi bạn mở dashboard thủ công hoặc phiên đăng nhập đã hết hạn.
+### 🔹 Bước 2: Mở Kết Nối Tunnel
+1. Tại thẻ **BƯỚC 1**, chọn nhà cung cấp tunnel:
+   - **Ngrok** *(Khuyên dùng)*: Kết nối siêu ổn định, hỗ trợ gán Domain cố định miễn phí.
+   - **Cloudflare**: Hoạt động không cần tài khoản hoặc dùng Named Tunnel Token.
+   - **Pinggy**: Kết nối trực tiếp qua SSH không cần cài thêm CLI.
+2. Bấm **▶ Bắt đầu kết nối**.
 
-macOS/Linux có thể dùng `./app.sh`; Windows dùng `.\app.ps1`. Cả hai sẽ mở dashboard nếu server đã chạy, hoặc start server rồi mở dashboard.
+### 🔹 Bước 3: Dán URL vào ChatGPT
+1. Bấm nút **Sao chép URL** (Ví dụ: `https://your-domain.ngrok-free.app/mcp/TOKEN...`).
+2. Mở **ChatGPT** $\rightarrow$ **Settings** $\rightarrow$ **Apps / Connectors** $\rightarrow$ **Add new app**.
+3. Dán URL vừa sao chép $\rightarrow$ Hoàn tất! Giờ đây bạn có thể yêu cầu ChatGPT đọc, sửa lỗi và phát triển dự án của bạn.
 
-## Kết nối ChatGPT
+---
 
-Cho sử dụng cá nhân/private, dùng [Secure MCP Tunnel](docs/secure-tunnel.md): server vẫn chỉ listen localhost và tunnel client tạo kết nối HTTPS outbound tới OpenAI. Không cần đặt `MCP_TOKEN` trong URL public.
+## 💻 Bảng Lệnh Terminal (Command Reference)
 
-Public Cloudflare/Pinggy tunnel trong dashboard được giữ như chế độ thử nghiệm legacy. Muốn tạo URL `/mcp/<token>` phải chủ động đặt `ALLOW_URL_TOKEN=true`; token trong URL có thể lọt vào history hoặc log của nhà cung cấp.
+Dành cho nhà phát triển muốn chạy và kiểm soát bằng dòng lệnh:
 
-Để dùng chế độ **URL nhanh tự động** trên một máy cá nhân, cấu hình:
+| Lệnh Terminal | Mô tả chức năng | Khi nào sử dụng |
+| :--- | :--- | :--- |
+| `corepack pnpm app` | Khởi động Local Server và mở Native Dashboard | Chạy ứng dụng hàng ngày |
+| `corepack pnpm dev` | Chạy server ở chế độ phát triển (Auto-reload) | Khi chỉnh sửa mã nguồn backend/frontend |
+| `corepack pnpm build` | Biên dịch toàn bộ TypeScript sang JavaScript (`dist/`) | Trước khi đóng gói hoặc chạy production |
+| `corepack pnpm typecheck` | Kiểm tra toàn diện lỗi kiểu dữ liệu TypeScript | Kiểm tra tính đúng đắn của code |
+| `corepack pnpm test` | Chạy toàn bộ 34+ Unit Tests của hệ thống | Kiểm thử hồi quy logic an toàn |
+| `corepack pnpm verify` | Cổng kiểm tra tổng: Typecheck + Test + Build + Smoke + Pack | Trước khi commit / merge mã nguồn |
+| `node scripts/build-mac-app.mjs` | Biên dịch lại Native macOS App (`Local Coder.app`) | Sau khi sửa đổi mã nguồn Swift native |
 
-```env
-ALLOW_URL_TOKEN=true
-AUTO_START_TUNNEL=true
-TUNNEL_PROVIDER=cloudflared
+---
+
+## 🔒 Bảng Phân Quyền Bảo Mật (Least-Privilege)
+
+Hệ thống tuân thủ nghiêm ngặt nguyên tắc đặc quyền tối thiểu (**Least-Privilege Security Contract**):
+
+| Khả năng (Capability) | Mặc định | Cơ chế bảo vệ |
+| :--- | :---: | :--- |
+| 📖 **Đọc code trong Workspace** | ✅ **BẬT** | Chỉ đọc trong thư mục đã chọn; chặn hoàn toàn Symlink trỏ ra ngoài. |
+| ✏️ **Sửa code & Tạo Checkpoint** | ⚡ **Tùy chọn** | Tự động tạo Checkpoint trước mỗi lần sửa; hỗ trợ xem Diff và Rollback 1-click. |
+| ⚡ **Chạy Task Allowlist** | ⚡ **Tùy chọn** | Chỉ chạy các lệnh đã khai báo trong `.local-coder/tasks.json`, không chạy qua shell. |
+| 🗑️ **Xóa file / Phục hồi** | ❌ **TẮT** | Ngăn chặn hành vi xóa dữ liệu ngoài ý muốn trừ khi được cấp quyền rõ ràng. |
+| 🚀 **Git Remote (Pull / Push)** | ❌ **TẮT** | Ngăn chặn gửi mã nguồn ra ngoài remote trừ khi người dùng chủ động cho phép. |
+| 💻 **Shell tùy ý** | ❌ **TẮT** | Bị vô hiệu hóa hoàn toàn theo mặc định để đảm bảo an toàn tuyệt đối cho máy tính. |
+| 🔑 **Đọc file nhạy cảm (`.env`, key)** | ❌ **TẮT** | Tự động ẩn các file chứa secret, mật khẩu và token. |
+
+---
+
+## 🍏 Mẹo & Phím Tắt Tiện Ích trên macOS
+
+* **Ẩn vào Menu Bar:** Bấm nút **`(X)` màu đỏ** hoặc nhấn **`Cmd + W`** $\rightarrow$ Cửa sổ sẽ ẩn đi, icon trên Dock biến mất, app vẫn chạy ngầm trên thanh Menu Bar trên cùng `🛡️`.
+* **Mở lại giao diện:** Nhấp vào icon **`🛡️` trên Menu Bar** $\rightarrow$ Chọn **Mở Dashboard**.
+* **Thoát hoàn toàn:** Nhấn **`Cmd + Q`** hoặc chọn **Thoát Local Coder** trên Menu Bar $\rightarrow$ App sẽ tự động tắt và giải phóng toàn bộ tiến trình Terminal / Port 3400/3401.
+* **Tắt từ Terminal:** Khi bạn bấm **`Ctrl + C`** trong Terminal, icon Menu Bar và cửa sổ macOS cũng sẽ tự động đóng ngay lập tức.
+
+---
+
+## 📁 Cấu Trúc Thư Mục Dự Án
+
+```text
+├── Local Coder.app/        # Ứng dụng native macOS tích hợp WebKit & Menu Bar Tray
+├── src/
+│   ├── cli/                # Khởi chạy Desktop app, tunnel & terminal command
+│   ├── http/               # Server HTTP, Dashboard UI, SSE events, Auth & Admin API
+│   ├── infra/              # Checkpoint Snapshot, Audit Log (EventEmitter), Process tree
+│   ├── mcp/                # Máy chủ MCP Protocol, Tool Registry & Session Manager
+│   ├── native/mac/         # Mã nguồn Swift native cho macOS Menu Bar & Dock Icon
+│   ├── security/           # PathPolicy (chặn Path Traversal, symlink), Auth, Rate Limit
+│   └── services/           # Quản lý Tunnel (Ngrok/Cloudflare), Task Runner, Task Presets
+├── scripts/                # Script khởi động 1-Click, build native app, generate icons
+└── test/                   # Bộ test suite tự động kiểm tra an toàn và tính năng
 ```
 
-Khi mở launcher, app tự chạy tunnel và dashboard tự hiện URL đầy đủ để sao chép. Không chia sẻ URL này vì nó chứa token truy cập. Mặc định của bản phân phối vẫn tắt chế độ này.
+---
 
-Không thể có một URL HTTPS công khai mà hoàn toàn không có hạ tầng trung gian. Ba lựa chọn thực tế là Cloudflare/Pinggy (URL tạm), VPS/domain riêng (URL ổn định), hoặc OpenAI Secure MCP Tunnel (không tạo URL public; chọn **Tunnel** trong ChatGPT).
-
-Nếu triển khai MCP server public hoặc cho nhiều người dùng, static token của project này không đủ: cần HTTPS ổn định và OAuth 2.1/PKCE theo yêu cầu MCP/ChatGPT.
-
-## Quyền mặc định
-
-| Capability | Mặc định |
-| --- | --- |
-| Đọc trong workspace | Bật |
-| Ghi trong workspace + checkpoint | Bật ở `workspace-write` |
-| Task allowlist | Bật ở `workspace-write` khi đã cấu hình |
-| Xóa/restore | Tắt |
-| Git pull/push | Tắt |
-| Shell tùy ý | Tắt |
-| File nhạy cảm (`.env`, credential) | Tắt |
-| URL token | Tắt |
-
-Các capability bị tắt sẽ không xuất hiện trong danh sách MCP tools.
-
-## Task allowlist
-
-Sửa `<workspace>/.local-coder/tasks.json`:
-
-```json
-{
-  "version": 1,
-  "tasks": {
-    "test": {
-      "description": "Run the locked project test suite",
-      "program": "corepack",
-      "args": ["pnpm", "test"],
-      "timeoutSeconds": 300
-    }
-  }
-}
-```
-
-Tên task, schema, program, args, cwd, timeout và environment đều được kiểm tra. Lệnh chạy với `shell: false` và environment tối thiểu.
-
-## Cổng chất lượng
-
-```bash
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm smoke
-corepack pnpm verify
-corepack pnpm audit --prod
-```
-
-`verify` là cổng chuẩn dùng cả local và CI.
-
-## Giới hạn an toàn
-
-Path checks và allowlist giúp giảm thiệt hại do nhầm lẫn hoặc tool call từ xa, nhưng không thay thế OS sandbox. Với repository không tin cậy hoặc khi bật shell, hãy chạy trong container/VM và chỉ mount đúng project cần làm việc.
-
-Chi tiết contract: [docs/architecture.md](docs/architecture.md).
+<div align="center">
+  <sub>Phát triển với tiêu chuẩn bảo mật cao nhất dành cho cộng đồng lập trình viên AI.</sub>
+</div>

@@ -37,6 +37,12 @@ let closing = false;
 const close = async () => {
   if (closing) return;
   closing = true;
+  if (process.platform === "darwin") {
+    try {
+      const { exec } = await import("node:child_process");
+      exec('pkill -f "Local Coder.app/Contents/MacOS/Local Coder"');
+    } catch {}
+  }
   await application.close();
 };
 process.once("SIGINT", () => void close().finally(() => process.exit(0)));
