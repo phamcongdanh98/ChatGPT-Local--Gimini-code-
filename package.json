@@ -1,0 +1,67 @@
+{
+  "name": "chatgpt-local-secure",
+  "version": "3.0.0",
+  "description": "A hardened least-privilege local coding MCP server for ChatGPT and other MCP clients",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "bin": {
+    "chatgpt-local-secure": "dist/src/index.js"
+  },
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/make-bin-executable.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js",
+    "smoke": "tsc -p tsconfig.json && node scripts/smoke.mjs",
+    "verify": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.json && node --test dist/test/*.test.js && node scripts/smoke.mjs && npm pack --dry-run --json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/src/index.js",
+    "serve": "tsc -p tsconfig.json && node dist/src/index.js",
+    "app": "tsc -p tsconfig.json && node scripts/app.mjs",
+    "dashboard": "tsc -p tsconfig.json && node dist/src/cli/desktop.js",
+    "desktop": "npm run dashboard",
+    "tunnel": "tsc -p tsconfig.json && node dist/src/cli/tunnel.js",
+    "tunnel:cloudflared": "tsc -p tsconfig.json && node dist/src/cli/tunnel.js cloudflared",
+    "token": "node scripts/generate-token.mjs",
+    "setup:local": "node scripts/setup-local.mjs",
+    "prepack": "npm run build"
+  },
+  "files": [
+    "dist/src",
+    "profiles",
+    "scripts",
+    "docs",
+    "start.ps1",
+    "openai-tunnel.ps1",
+    "app.ps1",
+    "start.sh",
+    "openai-tunnel.sh",
+    "app.sh",
+    ".env.example",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "chatgpt",
+    "coding-agent",
+    "local-development",
+    "least-privilege"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "dotenv": "17.4.2",
+    "express": "5.2.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "26.2.0",
+    "tsx": "4.23.11",
+    "typescript": "7.0.2"
+  }
+}

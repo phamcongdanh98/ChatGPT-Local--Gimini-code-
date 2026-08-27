@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "tasks": {
+    "typecheck": {
+      "description": "Run the project type checker",
+      "program": "pnpm",
+      "args": ["typecheck"],
+      "cwd": ".",
+      "timeoutSeconds": 180
+    },
+    "test": {
+      "description": "Run the project test suite",
+      "program": "pnpm",
+      "args": ["test"],
+      "cwd": ".",
+      "timeoutSeconds": 300
+    },
+    "verify": {
+      "description": "Run all project quality gates",
+      "program": "pnpm",
+      "args": ["verify"],
+      "cwd": ".",
+      "timeoutSeconds": 600
+    }
+  }
+}

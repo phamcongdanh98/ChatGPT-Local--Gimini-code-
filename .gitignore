@@ -1,0 +1,10 @@
+node_modules/
+.pnpm-store/
+dist/
+.env
+.local-coder/
+*.log
+.DS_Store
+coverage/
+Local Coder.app/
+*.app/
