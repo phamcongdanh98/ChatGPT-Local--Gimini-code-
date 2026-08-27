@@ -38,12 +38,21 @@ test("tunnel command forwards only the configured MCP port", () => {
     command: "cloudflared.exe",
     args: ["tunnel", "--url", "http://127.0.0.1:3000", "--no-autoupdate"],
   });
+  assert.deepEqual(buildTunnelCommand("cloudflared", 3000, { cloudflareToken: "eyJh..." }), {
+    command: "cloudflared",
+    args: ["tunnel", "run", "--token", "eyJh..."],
+  });
+  assert.deepEqual(buildTunnelCommand("ngrok", 3000, { ngrokDomain: "custom.ngrok-free.app", ngrokToken: "tok123" }), {
+    command: "ngrok",
+    args: ["http", "3000", "--domain", "custom.ngrok-free.app", "--authtoken", "tok123"],
+  });
 });
 
 test("tunnel configuration rejects invalid input and strips secrets", () => {
-  assert.equal(parseTunnelProvider(undefined), "pinggy");
-  assert.equal(parseTunnelProvider("CLOUDFLARED"), "cloudflared");
-  assert.throws(() => parseTunnelProvider("shell"), /pinggy hoặc cloudflared/);
+  assert.equal(parseTunnelProvider(undefined), "cloudflared");
+  assert.equal(parseTunnelProvider("PINGGY"), "pinggy");
+  assert.equal(parseTunnelProvider("NGROK"), "ngrok");
+  assert.throws(() => parseTunnelProvider("shell"), /cloudflared, pinggy hoặc ngrok/);
   assert.equal(parseTunnelPort("3000"), 3000);
   assert.throws(() => parseTunnelPort("0"), /1 đến 65535/);
   const safe = tunnelEnvironment({ PATH: "/bin", HOME: "/tmp/home", MCP_TOKEN: "secret", ADMIN_TOKEN: "secret-admin" });
@@ -62,6 +71,14 @@ test("tunnel URL parser accepts only the selected provider domain", () => {
   assert.equal(
     extractTunnelUrl("Visit https://random.trycloudflare.com now", "cloudflared"),
     "https://random.trycloudflare.com",
+  );
+  assert.equal(
+    extractTunnelUrl("Forwarding https://my-app.ngrok-free.app -> http://localhost:3000", "ngrok"),
+    "https://my-app.ngrok-free.app",
+  );
+  assert.equal(
+    extractTunnelUrl("", "cloudflared", "mcp.customdomain.com"),
+    "https://mcp.customdomain.com",
   );
 });
 

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import test from "node:test";
 import { loadConfig } from "../src/config.js";
 import { startApplication } from "../src/http/app.js";
@@ -46,4 +48,23 @@ test("application auto-starts the configured tunnel and owns its shutdown", asyn
     await fs.rm(root, { recursive: true, force: true });
   }
   assert.equal(tunnel.shutdownCount, 1);
+});
+
+test("tunnel manager immediately activates publicUrl when persistentDomain is configured", async (context) => {
+  const manager = new TunnelManager(10_000, () => {
+    const child = new EventEmitter() as any;
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.kill = () => true;
+    setImmediate(() => child.emit("spawn"));
+    return child;
+  });
+  context.after(async () => await manager.shutdown());
+  const status = await manager.start({
+    provider: "ngrok",
+    port: 3400,
+    ngrokDomain: "custom-static.ngrok-free.app",
+  });
+  assert.equal(status.state, "running");
+  assert.equal(status.publicUrl, "https://custom-static.ngrok-free.app");
 });

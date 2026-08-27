@@ -2,17 +2,25 @@ import { spawn, type SpawnOptions } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import "dotenv/config";
 
-export type TunnelProvider = "pinggy" | "cloudflared";
+export type TunnelProvider = "pinggy" | "cloudflared" | "ngrok";
 
 export interface TunnelCommand {
   command: string;
   args: string[];
 }
 
+export interface TunnelCommandOptions {
+  platform?: NodeJS.Platform | undefined;
+  cloudflareToken?: string | undefined;
+  ngrokToken?: string | undefined;
+  ngrokDomain?: string | undefined;
+  pinggyToken?: string | undefined;
+}
+
 export function parseTunnelProvider(value: string | undefined): TunnelProvider {
-  const provider = (value || "pinggy").trim().toLowerCase();
-  if (provider !== "pinggy" && provider !== "cloudflared") {
-    throw new Error("Tunnel provider phải là pinggy hoặc cloudflared");
+  const provider = (value || "cloudflared").trim().toLowerCase();
+  if (provider !== "pinggy" && provider !== "cloudflared" && provider !== "ngrok") {
+    throw new Error("Tunnel provider phải là cloudflared, pinggy hoặc ngrok");
   }
   return provider;
 }
@@ -25,16 +33,45 @@ export function parseTunnelPort(value: string | undefined): number {
   return port;
 }
 
-export function buildTunnelCommand(provider: TunnelProvider, port: number, platform = process.platform): TunnelCommand {
+export function buildTunnelCommand(
+  provider: TunnelProvider,
+  port: number,
+  optionsOrPlatform: TunnelCommandOptions | NodeJS.Platform = process.platform
+): TunnelCommand {
   if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
     throw new Error("Tunnel port không hợp lệ");
   }
+  const options: TunnelCommandOptions = typeof optionsOrPlatform === "string" ? { platform: optionsOrPlatform } : optionsOrPlatform;
+  const platform = options.platform ?? process.platform;
+  const cfToken = options.cloudflareToken || process.env.CLOUDFLARE_TUNNEL_TOKEN;
+  const ngrokToken = options.ngrokToken || process.env.NGROK_AUTHTOKEN;
+  const ngrokDomain = options.ngrokDomain || process.env.NGROK_DOMAIN;
+  const pinggyToken = options.pinggyToken || process.env.PINGGY_TOKEN;
+
   if (provider === "cloudflared") {
+    if (cfToken) {
+      return {
+        command: platform === "win32" ? "cloudflared.exe" : "cloudflared",
+        args: ["tunnel", "run", "--token", cfToken],
+      };
+    }
     return {
       command: platform === "win32" ? "cloudflared.exe" : "cloudflared",
       args: ["tunnel", "--url", `http://127.0.0.1:${port}`, "--no-autoupdate"],
     };
   }
+
+  if (provider === "ngrok") {
+    const args = ["http", String(port)];
+    if (ngrokDomain) args.push("--domain", ngrokDomain);
+    if (ngrokToken) args.push("--authtoken", ngrokToken);
+    return {
+      command: platform === "win32" ? "ngrok.exe" : "ngrok",
+      args,
+    };
+  }
+
+  const destination = pinggyToken ? `${pinggyToken}@a.pinggy.io` : "a.pinggy.io";
   return {
     command: platform === "win32" ? "ssh.exe" : "ssh",
     args: [
@@ -45,13 +82,17 @@ export function buildTunnelCommand(provider: TunnelProvider, port: number, platf
       "-o", "StrictHostKeyChecking=accept-new",
       "-p", "443",
       `-R0:localhost:${port}`,
-      "a.pinggy.io",
+      destination,
     ],
   };
 }
 
 export function tunnelEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const allowed = ["PATH", "Path", "PATHEXT", "SystemRoot", "WINDIR", "HOME", "USERPROFILE", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TERM"];
+  const allowed = [
+    "PATH", "Path", "PATHEXT", "SystemRoot", "WINDIR", "HOME", "USERPROFILE",
+    "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TERM",
+    "CLOUDFLARE_TUNNEL_TOKEN", "NGROK_AUTHTOKEN", "NGROK_DOMAIN", "PINGGY_TOKEN"
+  ];
   return Object.fromEntries(allowed.flatMap((name) => env[name] === undefined ? [] : [[name, env[name]]]));
 }
 

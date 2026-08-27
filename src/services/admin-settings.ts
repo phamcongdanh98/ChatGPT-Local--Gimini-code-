@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { PermissionMode } from "../config.js";
+import type { PermissionMode, TunnelProvider } from "../config.js";
 
 export interface AdminSettingsInput {
   workspacePath: string;
@@ -11,6 +11,12 @@ export interface AdminSettingsInput {
   allowRemoteGit: boolean;
   allowUnsafeShell: boolean;
   allowSensitiveFiles: boolean;
+  tunnelProvider?: TunnelProvider | undefined;
+  cloudflareTunnelToken?: string | undefined;
+  ngrokAuthToken?: string | undefined;
+  ngrokDomain?: string | undefined;
+  persistentTunnelDomain?: string | undefined;
+  autoReconnectTunnel?: boolean | undefined;
 }
 
 const SETTINGS_KEYS = [
@@ -21,6 +27,12 @@ const SETTINGS_KEYS = [
   "ALLOW_REMOTE_GIT",
   "ALLOW_UNSAFE_SHELL",
   "ALLOW_SENSITIVE_FILES",
+  "TUNNEL_PROVIDER",
+  "CLOUDFLARE_TUNNEL_TOKEN",
+  "NGROK_AUTHTOKEN",
+  "NGROK_DOMAIN",
+  "PERSISTENT_TUNNEL_DOMAIN",
+  "AUTO_RECONNECT_TUNNEL",
 ] as const;
 
 function exactBoolean(value: unknown, name: string): boolean {
@@ -45,6 +57,14 @@ export function parseAdminSettings(value: unknown): AdminSettingsInput {
     allowRemoteGit: exactBoolean(input.allowRemoteGit, "allowRemoteGit"),
     allowUnsafeShell: exactBoolean(input.allowUnsafeShell, "allowUnsafeShell"),
     allowSensitiveFiles: exactBoolean(input.allowSensitiveFiles, "allowSensitiveFiles"),
+    ...(typeof input.tunnelProvider === "string" && ["cloudflared", "pinggy", "ngrok"].includes(input.tunnelProvider)
+      ? { tunnelProvider: input.tunnelProvider as TunnelProvider }
+      : {}),
+    ...(typeof input.cloudflareTunnelToken === "string" ? { cloudflareTunnelToken: input.cloudflareTunnelToken.trim() } : {}),
+    ...(typeof input.ngrokAuthToken === "string" ? { ngrokAuthToken: input.ngrokAuthToken.trim() } : {}),
+    ...(typeof input.ngrokDomain === "string" ? { ngrokDomain: input.ngrokDomain.trim() } : {}),
+    ...(typeof input.persistentTunnelDomain === "string" ? { persistentTunnelDomain: input.persistentTunnelDomain.trim() } : {}),
+    ...(typeof input.autoReconnectTunnel === "boolean" ? { autoReconnectTunnel: input.autoReconnectTunnel } : {}),
   };
   if (settings.permissionMode === "read-only" && (
     settings.allowDestructive || settings.allowRemoteGit || settings.allowUnsafeShell || settings.allowSensitiveFiles
@@ -82,6 +102,12 @@ export async function persistAdminSettings(
     ALLOW_REMOTE_GIT: String(settings.allowRemoteGit),
     ALLOW_UNSAFE_SHELL: String(settings.allowUnsafeShell),
     ALLOW_SENSITIVE_FILES: String(settings.allowSensitiveFiles),
+    TUNNEL_PROVIDER: settings.tunnelProvider || "cloudflared",
+    CLOUDFLARE_TUNNEL_TOKEN: settings.cloudflareTunnelToken ?? "",
+    NGROK_AUTHTOKEN: settings.ngrokAuthToken ?? "",
+    NGROK_DOMAIN: settings.ngrokDomain ?? "",
+    PERSISTENT_TUNNEL_DOMAIN: settings.persistentTunnelDomain ?? "",
+    AUTO_RECONNECT_TUNNEL: String(settings.autoReconnectTunnel ?? true),
   };
   const found = new Set<string>();
   const lines = original.split(/\r?\n/).map((line) => {

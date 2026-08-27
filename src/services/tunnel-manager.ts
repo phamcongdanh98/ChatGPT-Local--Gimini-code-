@@ -6,10 +6,21 @@ export type TunnelState = "stopped" | "starting" | "running" | "stopping" | "fai
 
 export interface TunnelStatus {
   state: TunnelState;
-  provider?: TunnelProvider;
-  publicUrl?: string;
-  startedAt?: string;
-  error?: string;
+  provider?: TunnelProvider | undefined;
+  publicUrl?: string | undefined;
+  startedAt?: string | undefined;
+  error?: string | undefined;
+}
+
+export interface TunnelStartOptions {
+  provider?: string | undefined;
+  port: number;
+  cloudflareToken?: string | undefined;
+  ngrokToken?: string | undefined;
+  ngrokDomain?: string | undefined;
+  pinggyToken?: string | undefined;
+  persistentDomain?: string | undefined;
+  autoReconnect?: boolean | undefined;
 }
 
 type TunnelChild = ChildProcessByStdio<null, Readable, Readable>;
@@ -21,15 +32,24 @@ export type TunnelSpawner = (
 
 const defaultSpawner: TunnelSpawner = (command, args, options) => spawn(command, args, options) as TunnelChild;
 
-export function extractTunnelUrl(output: string, provider: TunnelProvider): string | undefined {
+export function extractTunnelUrl(output: string, provider: TunnelProvider, persistentDomain?: string): string | undefined {
+  if (persistentDomain) {
+    const cleaned = persistentDomain.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    if (cleaned) return `https://${cleaned}`;
+  }
   const plain = output.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, " ");
   for (const match of plain.matchAll(/https:\/\/[^\s"'<>\]]+/gi)) {
     try {
       const candidate = new URL(match[0].replace(/[),.;]+$/, ""));
       const host = candidate.hostname.toLowerCase();
-      const allowed = provider === "pinggy"
-        ? host === "pinggy.io" || host.endsWith(".pinggy.io") || host === "pinggy.link" || host.endsWith(".pinggy.link")
-        : host === "trycloudflare.com" || host.endsWith(".trycloudflare.com");
+      let allowed = false;
+      if (provider === "pinggy") {
+        allowed = host === "pinggy.io" || host.endsWith(".pinggy.io") || host === "pinggy.link" || host.endsWith(".pinggy.link");
+      } else if (provider === "ngrok") {
+        allowed = host.endsWith(".ngrok-free.app") || host.endsWith(".ngrok.app") || host.endsWith(".ngrok.io") || host.endsWith(".ngrok-free.dev");
+      } else {
+        allowed = host === "trycloudflare.com" || host.endsWith(".trycloudflare.com") || host.endsWith(".cfargotunnel.com");
+      }
       if (allowed && candidate.protocol === "https:") return candidate.origin;
     } catch {
       // Ignore malformed URLs in provider output.
@@ -43,6 +63,10 @@ export class TunnelManager {
   private current: TunnelStatus = { state: "stopped" };
   private output = "";
   private startupTimer: NodeJS.Timeout | undefined;
+  private reconnectTimer: NodeJS.Timeout | undefined;
+  private reconnectAttempts = 0;
+  private lastStartOptions: TunnelStartOptions | undefined;
+  private manualStop = false;
 
   constructor(
     private readonly startupTimeoutMs = 25_000,
@@ -53,12 +77,46 @@ export class TunnelManager {
     return { ...this.current };
   }
 
-  async start(providerInput: string | undefined, port: number): Promise<TunnelStatus> {
-    if (this.child) throw new Error("Tunnel đang chạy");
-    const provider = parseTunnelProvider(providerInput);
-    const command = buildTunnelCommand(provider, port);
+  async start(
+    providerOrOptions: string | TunnelStartOptions | undefined,
+    portInput?: number,
+  ): Promise<TunnelStatus> {
+    this.clearReconnectTimer();
+    this.manualStop = false;
+
+    const options: TunnelStartOptions = typeof providerOrOptions === "object" && providerOrOptions !== null
+      ? providerOrOptions
+      : { provider: providerOrOptions, port: portInput ?? 3000 };
+
+    this.lastStartOptions = options;
+
+    if (this.child) {
+      if (this.current.state === "running") return this.status();
+      await this.stop();
+    }
+
+    const provider = parseTunnelProvider(options.provider);
+    const command = buildTunnelCommand(provider, options.port, {
+      cloudflareToken: options.cloudflareToken,
+      ngrokToken: options.ngrokToken,
+      ngrokDomain: options.ngrokDomain,
+      pinggyToken: options.pinggyToken,
+    });
+
     this.output = "";
-    this.current = { state: "starting", provider, startedAt: new Date().toISOString() };
+    const isNamedCloudflare = provider === "cloudflared" && Boolean(options.cloudflareToken || process.env.CLOUDFLARE_TUNNEL_TOKEN);
+    const hasStaticUrl = options.persistentDomain || (provider === "ngrok" && (options.ngrokDomain || process.env.NGROK_DOMAIN));
+
+    const initialUrl = hasStaticUrl
+      ? extractTunnelUrl("", provider, options.persistentDomain || (options.ngrokDomain || process.env.NGROK_DOMAIN))
+      : undefined;
+
+    this.current = {
+      state: initialUrl ? "running" : "starting",
+      provider,
+      startedAt: new Date().toISOString(),
+      ...(initialUrl ? { publicUrl: initialUrl } : {}),
+    };
 
     const child = this.spawnTunnel(command.command, command.args, {
       stdio: ["ignore", "pipe", "pipe"],
@@ -70,9 +128,10 @@ export class TunnelManager {
 
     const inspect = (chunk: Buffer): void => {
       if (this.output.length < 32 * 1024) this.output += chunk.toString("utf8").slice(0, 32 * 1024 - this.output.length);
-      const publicUrl = extractTunnelUrl(this.output, provider);
+      const publicUrl = extractTunnelUrl(this.output, provider, options.persistentDomain);
       if (publicUrl) {
         this.clearStartupTimer();
+        this.reconnectAttempts = 0;
         this.current = { ...this.current, state: "running", publicUrl };
       }
     };
@@ -83,45 +142,68 @@ export class TunnelManager {
       this.clearStartupTimer();
       this.child = undefined;
       this.output = "";
+
       if (this.current.state === "failed") {
         this.current = { ...this.current };
-      } else if (this.current.state === "stopping" || signal || code === 0 || code === 130) {
+        return;
+      }
+
+      const expectedClose = this.manualStop || this.current.state === "stopping" || signal || code === 0 || code === 130;
+      if (expectedClose) {
         this.current = { state: "stopped" };
-      } else {
-        this.current = { state: "failed", provider, error: `${provider} đã dừng (exit ${code ?? "unknown"})` };
+        return;
+      }
+
+      this.current = { state: "failed", provider, error: `${provider} đã dừng (exit ${code ?? "unknown"})` };
+
+      // Auto reconnect if enabled and not manually stopped
+      const shouldReconnect = options.autoReconnect ?? (process.env.AUTO_RECONNECT_TUNNEL !== "false");
+      if (shouldReconnect && !this.manualStop) {
+        this.scheduleReconnect();
       }
     });
 
     await new Promise<void>((resolve, reject) => {
-      child.once("spawn", resolve);
+      child.once("spawn", () => {
+        if (isNamedCloudflare && initialUrl) {
+          this.current = { ...this.current, state: "running", publicUrl: initialUrl };
+        }
+        resolve();
+      });
       child.once("error", (error) => {
         if (this.child === child) {
           this.clearStartupTimer();
           this.child = undefined;
           this.output = "";
-          this.current = { state: "failed", provider, error: `Không thể mở ${provider}. Kiểm tra OpenSSH hoặc cloudflared.` };
+          this.current = { state: "failed", provider, error: `Không thể mở ${provider}. Kiểm tra cloudflared, ngrok hoặc OpenSSH.` };
         }
         reject(new Error(this.current.error ?? `Không thể mở ${provider}`, { cause: error }));
       });
     });
-    this.startupTimer = setTimeout(() => {
-      if (this.child !== child || this.current.publicUrl) return;
-      this.current = {
-        state: "failed",
-        provider,
-        error: `${provider} không trả URL sau ${Math.ceil(this.startupTimeoutMs / 1000)} giây. Hãy thử nhà cung cấp khác.`,
-      };
-      child.kill("SIGTERM");
-      const force = setTimeout(() => child.kill("SIGKILL"), 2_000);
-      force.unref();
-    }, this.startupTimeoutMs);
-    this.startupTimer.unref();
+
+    if (!initialUrl && !isNamedCloudflare) {
+      this.startupTimer = setTimeout(() => {
+        if (this.child !== child || this.current.publicUrl) return;
+        this.current = {
+          state: "failed",
+          provider,
+          error: `${provider} không trả URL sau ${Math.ceil(this.startupTimeoutMs / 1000)} giây. Hãy thử nhà cung cấp khác.`,
+        };
+        child.kill("SIGTERM");
+        const force = setTimeout(() => child.kill("SIGKILL"), 2_000);
+        force.unref();
+      }, this.startupTimeoutMs);
+      this.startupTimer.unref();
+    }
+
     return this.status();
   }
 
   async stop(): Promise<TunnelStatus> {
-    const child = this.child;
+    this.manualStop = true;
+    this.clearReconnectTimer();
     this.clearStartupTimer();
+    const child = this.child;
     if (!child) {
       this.current = { state: "stopped" };
       return this.status();
@@ -156,5 +238,24 @@ export class TunnelManager {
     if (!this.startupTimer) return;
     clearTimeout(this.startupTimer);
     this.startupTimer = undefined;
+  }
+
+  private clearReconnectTimer(): void {
+    if (!this.reconnectTimer) return;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = undefined;
+  }
+
+  private scheduleReconnect(): void {
+    this.clearReconnectTimer();
+    if (!this.lastStartOptions || this.manualStop) return;
+
+    this.reconnectAttempts += 1;
+    const delayMs = Math.min(30_000, 2_000 * Math.pow(1.5, Math.min(this.reconnectAttempts, 6)));
+    this.reconnectTimer = setTimeout(() => {
+      if (this.manualStop || !this.lastStartOptions) return;
+      void this.start(this.lastStartOptions).catch(() => undefined);
+    }, delayMs);
+    this.reconnectTimer.unref();
   }
 }

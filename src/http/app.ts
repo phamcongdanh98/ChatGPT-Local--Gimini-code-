@@ -110,7 +110,12 @@ function environmentForSettings(config: AppConfig, settings: AdminSettingsInput)
     PORT: String(config.port),
     ALLOW_URL_TOKEN: String(config.allowUrlToken),
     AUTO_START_TUNNEL: String(config.autoStartTunnel),
-    TUNNEL_PROVIDER: config.tunnelProvider,
+    TUNNEL_PROVIDER: settings.tunnelProvider || config.tunnelProvider,
+    CLOUDFLARE_TUNNEL_TOKEN: settings.cloudflareTunnelToken ?? config.cloudflareTunnelToken ?? "",
+    NGROK_AUTHTOKEN: settings.ngrokAuthToken ?? config.ngrokAuthToken ?? "",
+    NGROK_DOMAIN: settings.ngrokDomain ?? config.ngrokDomain ?? "",
+    PERSISTENT_TUNNEL_DOMAIN: settings.persistentTunnelDomain ?? config.persistentTunnelDomain ?? "",
+    AUTO_RECONNECT_TUNNEL: String(settings.autoReconnectTunnel ?? config.autoReconnectTunnel),
     PERMISSION_MODE: settings.permissionMode,
     ALLOW_DESTRUCTIVE: String(settings.allowDestructive),
     ALLOW_REMOTE_GIT: String(settings.allowRemoteGit),
@@ -239,7 +244,22 @@ export async function startApplication(config: AppConfig, options: ApplicationOp
       adminPort = await listen(adminServer, config.adminPort, "127.0.0.1");
     }
     if (config.autoStartTunnel) {
-      await tunnel.start(config.tunnelProvider, port).catch(() => undefined);
+      const hasCustomOptions = Boolean(
+        config.cloudflareTunnelToken || config.ngrokAuthToken || config.ngrokDomain || config.persistentTunnelDomain || !config.autoReconnectTunnel
+      );
+      if (hasCustomOptions) {
+        await tunnel.start({
+          provider: config.tunnelProvider,
+          port,
+          cloudflareToken: config.cloudflareTunnelToken,
+          ngrokToken: config.ngrokAuthToken,
+          ngrokDomain: config.ngrokDomain,
+          persistentDomain: config.persistentTunnelDomain,
+          autoReconnect: config.autoReconnectTunnel,
+        }).catch(() => undefined);
+      } else {
+        await tunnel.start(config.tunnelProvider, port).catch(() => undefined);
+      }
     }
   } catch (error) {
     await closeHttp(httpServer);

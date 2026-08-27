@@ -219,6 +219,11 @@ function settingsPayload(config: AppConfig): Record<string, unknown> {
     allowUrlToken: config.allowUrlToken,
     autoStartTunnel: config.autoStartTunnel,
     tunnelProvider: config.tunnelProvider,
+    cloudflareTunnelToken: config.cloudflareTunnelToken ?? "",
+    ngrokAuthToken: config.ngrokAuthToken ?? "",
+    ngrokDomain: config.ngrokDomain ?? "",
+    persistentTunnelDomain: config.persistentTunnelDomain ?? "",
+    autoReconnectTunnel: config.autoReconnectTunnel,
     allowDestructive: config.allowDestructive,
     allowRemoteGit: config.allowRemoteGit,
     allowUnsafeShell: config.allowUnsafeShell,
@@ -383,9 +388,18 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
     });
   });
   app.post("/api/tunnel/start", requireAdminAction, json, asyncRoute(async (request, response) => {
-    const provider = typeof request.body?.provider === "string" ? request.body.provider : "pinggy";
+    const config = dependencies.config();
+    const provider = typeof request.body?.provider === "string" ? request.body.provider : config.tunnelProvider;
     try {
-      response.status(202).json(await dependencies.tunnel.start(provider, dependencies.mcpPort));
+      response.status(202).json(await dependencies.tunnel.start({
+        provider,
+        port: dependencies.mcpPort,
+        cloudflareToken: config.cloudflareTunnelToken,
+        ngrokToken: config.ngrokAuthToken,
+        ngrokDomain: config.ngrokDomain,
+        persistentDomain: config.persistentTunnelDomain,
+        autoReconnect: config.autoReconnectTunnel,
+      }));
     } catch (error) {
       response.status(409).json({ error: error instanceof Error ? error.message : "Không thể mở tunnel" });
     }

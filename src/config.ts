@@ -5,7 +5,7 @@ export const APP_NAME = "chatgpt-local-secure";
 export const APP_VERSION = "3.0.0";
 
 export type PermissionMode = "read-only" | "workspace-write";
-export type TunnelProvider = "cloudflared" | "pinggy";
+export type TunnelProvider = "cloudflared" | "pinggy" | "ngrok";
 
 export interface AppConfig {
   host: string;
@@ -14,6 +14,11 @@ export interface AppConfig {
   allowUrlToken: boolean;
   autoStartTunnel: boolean;
   tunnelProvider: TunnelProvider;
+  cloudflareTunnelToken?: string | undefined;
+  ngrokAuthToken?: string | undefined;
+  ngrokDomain?: string | undefined;
+  persistentTunnelDomain?: string | undefined;
+  autoReconnectTunnel: boolean;
   workspaceRoots: string[];
   primaryRoot: string;
   stateDir: string;
@@ -68,8 +73,8 @@ function permissionMode(value: string | undefined): PermissionMode {
 
 function tunnelProvider(value: string | undefined): TunnelProvider {
   const normalized = (value || "cloudflared").trim().toLowerCase();
-  if (normalized !== "cloudflared" && normalized !== "pinggy") {
-    throw new Error("TUNNEL_PROVIDER must be cloudflared or pinggy");
+  if (normalized !== "cloudflared" && normalized !== "pinggy" && normalized !== "ngrok") {
+    throw new Error("TUNNEL_PROVIDER must be cloudflared or pinggy or ngrok");
   }
   return normalized;
 }
@@ -129,6 +134,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, _cwd = process.
     allowUrlToken: bool(env.ALLOW_URL_TOKEN, false),
     autoStartTunnel: bool(env.AUTO_START_TUNNEL, false),
     tunnelProvider: tunnelProvider(env.TUNNEL_PROVIDER),
+    cloudflareTunnelToken: env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined,
+    ngrokAuthToken: env.NGROK_AUTHTOKEN?.trim() || undefined,
+    ngrokDomain: env.NGROK_DOMAIN?.trim() || undefined,
+    persistentTunnelDomain: env.PERSISTENT_TUNNEL_DOMAIN?.trim() || undefined,
+    autoReconnectTunnel: bool(env.AUTO_RECONNECT_TUNNEL, true),
     workspaceRoots: roots,
     primaryRoot,
     stateDir,

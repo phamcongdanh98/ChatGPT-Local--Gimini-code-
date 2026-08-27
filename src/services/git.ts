@@ -57,6 +57,17 @@ export class GitService {
   }
 
   async remote(repo: string, operation: "pull" | "push"): Promise<ProcessResult> {
+    if (operation === "push") {
+      const initial = await this.git(repo, ["push"]);
+      if (initial.exitCode !== 0 && /no upstream branch|has no upstream/i.test(initial.stderr)) {
+        const branchResult = await this.git(repo, ["rev-parse", "--abbrev-ref", "HEAD"]);
+        const branch = branchResult.stdout.trim();
+        if (branch && branch !== "HEAD" && /^[a-zA-Z0-9._/-]+$/.test(branch)) {
+          return await this.git(repo, ["push", "-u", "origin", branch]);
+        }
+      }
+      return initial;
+    }
     return await this.git(repo, [operation]);
   }
 
