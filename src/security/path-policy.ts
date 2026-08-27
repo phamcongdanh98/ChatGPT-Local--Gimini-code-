@@ -67,12 +67,14 @@ function isInternalMetadata(candidate: string): boolean {
 export class PathPolicy {
   readonly roots: string[];
   readonly primaryRoot: string;
+  readonly workspaceName: string;
   readonly stateDir: string;
   readonly allowSensitiveFiles: boolean;
 
   private constructor(roots: string[], stateDir: string, allowSensitiveFiles: boolean) {
     this.roots = roots;
     this.primaryRoot = roots[0] as string;
+    this.workspaceName = path.basename(this.primaryRoot);
     this.stateDir = stateDir;
     this.allowSensitiveFiles = allowSensitiveFiles;
   }
@@ -118,9 +120,19 @@ export class PathPolicy {
 
   async resolve(inputPath: string, options: ResolveOptions = {}): Promise<string> {
     if (!inputPath || inputPath.includes("\0")) throw new Error("Path is empty or invalid");
-    const absolute = path.isAbsolute(inputPath)
-      ? path.resolve(inputPath)
-      : path.resolve(this.primaryRoot, inputPath);
+    let cleaned = inputPath.trim();
+    if (/^root0[\/\\]/i.test(cleaned)) {
+      cleaned = cleaned.replace(/^root0[\/\\]/i, "");
+    } else if (
+      this.workspaceName &&
+      (cleaned.toLowerCase().startsWith(`${this.workspaceName.toLowerCase()}/`) ||
+       cleaned.toLowerCase().startsWith(`${this.workspaceName.toLowerCase()}\\`))
+    ) {
+      cleaned = cleaned.slice(this.workspaceName.length + 1);
+    }
+    const absolute = path.isAbsolute(cleaned)
+      ? path.resolve(cleaned)
+      : path.resolve(this.primaryRoot, cleaned);
     const { canonical, existed } = await canonicalizePotentialPath(absolute);
 
     if (!this.roots.some((root) => isWithin(root, canonical))) {

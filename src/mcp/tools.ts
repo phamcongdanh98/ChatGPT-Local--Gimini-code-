@@ -8,7 +8,7 @@ import type { AuditLog } from "../infra/audit.js";
 import type { CheckpointStore } from "../infra/checkpoints.js";
 import { runProcess, safeEnvironment, type ProcessResult } from "../lib/process.js";
 import type { PathPolicy } from "../security/path-policy.js";
-import { projectContext } from "../services/context.js";
+import { generateWorkspaceOverview, projectContext } from "../services/context.js";
 import type { FileService } from "../services/files.js";
 import type { GitService } from "../services/git.js";
 import type { TaskRunner } from "../services/task-runner.js";
@@ -67,12 +67,14 @@ async function audited(
 
 export function createMcpServer(services: Services): McpServer {
   const { config, policy, audit, checkpoints, files, git, tasks } = services;
+  const workspaceName = policy.workspaceName || path.basename(policy.primaryRoot);
   const server = new McpServer(
     { name: "chatgpt-local-secure", version: "3.0.0" },
     {
       instructions: [
+        `You are connected to workspace folder '${workspaceName}'.`,
         "Operate only inside configured workspace roots.",
-        "Inspect project_context and git_status before editing unfamiliar code.",
+        "Inspect workspace_overview or project_context to view the directory tree before editing code.",
         "Prefer edit_file or apply_patch over whole-file replacement.",
         "Run only operator-approved named tasks. Destructive and network operations may be unavailable.",
         "Every file mutation creates a checkpoint; report its checkpointId.",
@@ -85,7 +87,14 @@ export function createMcpServer(services: Services): McpServer {
     description: "Show active permission mode, capability flags, and limits without revealing tokens or machine paths.",
     inputSchema: {},
     annotations: readOnly,
-  }, async () => result(publicConfig(config)));
+  }, async () => result({ ...publicConfig(config), workspaceName }));
+
+  server.registerTool("workspace_overview", {
+    title: "Workspace Overview & Directory Tree",
+    description: "Get the project folder name and complete directory tree of the workspace selected by the user.",
+    inputSchema: {},
+    annotations: readOnly,
+  }, async () => await audited(audit, "workspace_overview", "read", undefined, async () => await generateWorkspaceOverview(policy)));
 
   server.registerTool("project_context", {
     title: "Project Context",

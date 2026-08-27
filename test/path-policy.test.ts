@@ -27,4 +27,6 @@ test("path policy blocks traversal, symlink escape, state, and secrets", async (
   await assert.rejects(policy.resolve(".env", { mustExist: true }), /Sensitive/);
   await assert.rejects(policy.resolve(".git/config", { mustExist: true }), /metadata/);
   assert.equal(await policy.resolve(".env.example", { mustExist: true }), await fs.realpath(path.join(root, ".env.example")));
+  assert.equal(await policy.resolve("root0/.env.example", { mustExist: true }), await fs.realpath(path.join(root, ".env.example")));
+  assert.equal(await policy.resolve("workspace/.env.example", { mustExist: true }), await fs.realpath(path.join(root, ".env.example")));
 });

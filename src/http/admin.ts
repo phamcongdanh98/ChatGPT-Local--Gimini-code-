@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import type { AppConfig } from "../config.js";
 import { APP_NAME, APP_VERSION, publicConfig } from "../config.js";
@@ -319,6 +321,14 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
     next();
   });
   app.get("/assets/admin.css", (_request, response) => response.type("css").send(ADMIN_STYLESHEET));
+  const logoFile = path.resolve(process.cwd(), "src/assets/logo.png");
+  const fallbackLogo = path.resolve(process.cwd(), "dist/assets/logo.png");
+  const sendLogo = (_request: Request, response: Response) => {
+    response.type("png").sendFile(fs.existsSync(logoFile) ? logoFile : fallbackLogo);
+  };
+  app.get("/assets/logo.png", sendLogo);
+  app.get("/assets/logo.jpg", sendLogo);
+  app.get("/favicon.ico", sendLogo);
   app.get("/login", (_request, response) => response.type("html").send(adminLoginHtml(false)));
   app.post("/login", rateLimit(10), express.urlencoded({ extended: false, limit: 8 * 1024 }), (request, response) => {
     const candidate = typeof request.body?.token === "string" ? request.body.token : "";

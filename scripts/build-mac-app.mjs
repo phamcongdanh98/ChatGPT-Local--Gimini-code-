@@ -26,6 +26,8 @@ export async function buildMacAppBundle(projectRoot = process.cwd()) {
   <string>Local Coder</string>
   <key>CFBundleDisplayName</key>
   <string>Local Coder</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -44,6 +46,10 @@ export async function buildMacAppBundle(projectRoot = process.cwd()) {
 `;
 
   await fs.writeFile(path.join(contentsDir, "Info.plist"), infoPlist, "utf8");
+  const icnsSource = path.join(projectRoot, "src", "assets", "AppIcon.icns");
+  try {
+    await fs.copyFile(icnsSource, path.join(resourcesDir, "AppIcon.icns"));
+  } catch {}
 
   const swiftSource = path.join(projectRoot, "src", "native", "mac", "main.swift");
   const binaryOutput = path.join(macOsDir, "LocalCoder");
