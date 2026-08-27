@@ -30,6 +30,7 @@ export interface ApplicationOptions {
   envFile?: string;
   tunnel?: TunnelManager;
   pickFolder?: () => Promise<string | undefined>;
+  adminHandoffToken?: string;
 }
 
 interface RuntimeServices {
@@ -108,6 +109,8 @@ function environmentForSettings(config: AppConfig, settings: AdminSettingsInput)
     HOST: config.host,
     PORT: String(config.port),
     ALLOW_URL_TOKEN: String(config.allowUrlToken),
+    AUTO_START_TUNNEL: String(config.autoStartTunnel),
+    TUNNEL_PROVIDER: config.tunnelProvider,
     PERMISSION_MODE: settings.permissionMode,
     ALLOW_DESTRUCTIVE: String(settings.allowDestructive),
     ALLOW_REMOTE_GIT: String(settings.allowRemoteGit),
@@ -231,8 +234,12 @@ export async function startApplication(config: AppConfig, options: ApplicationOp
         tunnel,
         updateSettings,
         ...(options.pickFolder ? { pickFolder: options.pickFolder } : {}),
+        ...(options.adminHandoffToken ? { adminHandoffToken: options.adminHandoffToken } : {}),
       }));
       adminPort = await listen(adminServer, config.adminPort, "127.0.0.1");
+    }
+    if (config.autoStartTunnel) {
+      await tunnel.start(config.tunnelProvider, port).catch(() => undefined);
     }
   } catch (error) {
     await closeHttp(httpServer);

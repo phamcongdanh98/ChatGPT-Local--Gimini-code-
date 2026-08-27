@@ -27,6 +27,7 @@ export interface AdminDependencies {
   tunnel: TunnelManager;
   updateSettings: (settings: AdminSettingsInput) => Promise<AppConfig>;
   pickFolder?: () => Promise<string | undefined>;
+  adminHandoffToken?: string;
 }
 
 export interface ConnectionTestStep {
@@ -147,40 +148,43 @@ async function testConnection(dependencies: AdminDependencies): Promise<Connecti
   const recentEvents = dependencies.audit().recent(5);
   const lastEvent = recentEvents[0];
   let chatgptStep: ConnectionTestStep = {
-    name: "Phiên MCP đang hoạt động",
+    name: "Hoạt động MCP gần đây",
     ok: true,
-    detail: "Sẵn sàng nhận kết nối từ ChatGPT.",
+    detail: "Sẵn sàng nhận kết nối từ một MCP client.",
   };
   if (stats.count > 0) {
     const timeAgo = stats.lastSeen ? `${Math.max(1, Math.round((Date.now() - stats.lastSeen) / 1000))}s trước` : "vừa xong";
     chatgptStep = {
-      name: "Phiên MCP đang hoạt động",
+      name: "Hoạt động MCP gần đây",
       ok: true,
-      detail: `Đang có ${stats.count} phiên MCP (hoạt động ${timeAgo}${lastEvent ? ` · tool gần nhất: ${lastEvent.tool}` : ""})`,
+      detail: `Đang có ${stats.count} phiên MCP (hoạt động ${timeAgo}${lastEvent ? ` · tool gần nhất: ${lastEvent.tool}` : ""}). Không thể xác định client chỉ từ phiên transport.`,
     };
   } else if (lastEvent) {
     const timeAgo = `${Math.max(1, Math.round((Date.now() - new Date(lastEvent.timestamp).getTime()) / 1000))}s trước`;
     chatgptStep = {
-      name: "Phiên MCP đang hoạt động",
+      name: "Hoạt động MCP gần đây",
       ok: true,
       detail: `Hiện không có phiên mở (lần gọi tool cuối: ${timeAgo} · ${lastEvent.tool})`,
     };
   } else {
     chatgptStep = {
-      name: "Phiên MCP đang hoạt động",
+      name: "Hoạt động MCP gần đây",
       ok: true,
       detail: "Chưa có phiên MCP nào. Kết nối từ ChatGPT hoặc một MCP client để bắt đầu.",
     };
   }
 
-  const overallOk = localStep.ok && protocolStep.ok && (tunnelStatus.state === "stopped" || tunnelStep.ok);
-  let summary = "Kết nối hoàn hảo! Sẵn sàng phục vụ ChatGPT.";
+  const publicUrlReady = tunnelStatus.state !== "running" || (tunnelStep.ok && config.allowUrlToken);
+  const overallOk = localStep.ok && protocolStep.ok && publicUrlReady;
+  let summary = "URL connector đã sẵn sàng để dán vào ChatGPT.";
   if (!localStep.ok || !protocolStep.ok) {
     summary = "Lỗi kết nối Local Server hoặc giao thức MCP.";
   } else if (tunnelStatus.state === "stopped") {
     summary = "Local server tốt. Ưu tiên OpenAI Secure MCP Tunnel để kết nối từ ChatGPT.";
   } else if (!tunnelStep.ok) {
     summary = "Tunnel đang gặp sự cố kết nối từ Internet.";
+  } else if (!config.allowUrlToken) {
+    summary = "Tunnel hoạt động nhưng URL dán trực tiếp chưa bật xác thực bằng URL token.";
   }
 
   return {
@@ -212,6 +216,9 @@ function settingsPayload(config: AppConfig): Record<string, unknown> {
   return {
     workspacePath: config.primaryRoot,
     permissionMode: config.permissionMode,
+    allowUrlToken: config.allowUrlToken,
+    autoStartTunnel: config.autoStartTunnel,
+    tunnelProvider: config.tunnelProvider,
     allowDestructive: config.allowDestructive,
     allowRemoteGit: config.allowRemoteGit,
     allowUnsafeShell: config.allowUnsafeShell,
@@ -275,6 +282,12 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
       browserSessions.delete(oldest);
     }
   };
+  const grantBrowserSession = (response: Response): void => {
+    pruneSessions();
+    const sessionToken = crypto.randomBytes(32).toString("base64url");
+    browserSessions.set(sessionToken, Date.now() + browserSessionTtlSeconds * 1000);
+    response.setHeader("Set-Cookie", `${cookieName}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${browserSessionTtlSeconds}`);
+  };
   const requireAdminSession = (request: Request, response: Response, next: NextFunction): void => {
     const config = dependencies.config();
     if (authenticateAdminRequest(request, config.adminToken)) {
@@ -308,10 +321,20 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
       response.status(401).type("html").send(adminLoginHtml(true));
       return;
     }
-    pruneSessions();
-    const sessionToken = crypto.randomBytes(32).toString("base64url");
-    browserSessions.set(sessionToken, Date.now() + browserSessionTtlSeconds * 1000);
-    response.setHeader("Set-Cookie", `${cookieName}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${browserSessionTtlSeconds}`);
+    grantBrowserSession(response);
+    response.redirect(303, "/ui");
+  });
+
+  let handoffAvailable = Boolean(dependencies.adminHandoffToken);
+  app.get("/bootstrap-session/:token", rateLimit(10), (request, response) => {
+    const suppliedToken = Array.isArray(request.params.token) ? request.params.token[0] ?? "" : request.params.token ?? "";
+    if (!handoffAvailable || !dependencies.adminHandoffToken
+      || !equalSecret(suppliedToken, dependencies.adminHandoffToken)) {
+      response.status(404).type("text").send("Liên kết mở app đã hết hạn");
+      return;
+    }
+    handoffAvailable = false;
+    grantBrowserSession(response);
     response.redirect(303, "/ui");
   });
 

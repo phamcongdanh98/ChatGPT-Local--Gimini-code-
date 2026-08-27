@@ -1,3 +1,10 @@
+$ErrorActionPreference = "Stop"
+
+if (-not (Test-Path "node_modules\.bin\tsc.cmd")) {
+  Write-Host "Đang cài thành phần cần thiết (chỉ làm một lần)..."
+  corepack pnpm install --frozen-lockfile
+}
+
 $ErrorActionPreference = "SilentlyContinue"
 
 $adminPort = "3301"

@@ -121,6 +121,7 @@ export function safeEnvironment(stateDir: string, additions: Record<string, stri
     CI: "true",
     NO_COLOR: "1",
     HOME: path.join(stateDir, "runtime-home"),
+    ...(process.env.SSH_AUTH_SOCK ? { SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK } : {}),
   };
   for (const [key, value] of Object.entries(additions)) {
     if (!/^[A-Z_][A-Z0-9_]*$/i.test(key)) throw new Error(`Invalid task environment key: ${key}`);

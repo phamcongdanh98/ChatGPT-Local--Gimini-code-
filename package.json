@@ -40,6 +40,8 @@
     "start.sh",
     "openai-tunnel.sh",
     "app.sh",
+    "Start ChatGPT Local.command",
+    "Start ChatGPT Local.cmd",
     ".env.example",
     "README.md",
     "LICENSE"

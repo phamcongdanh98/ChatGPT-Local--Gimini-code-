@@ -21,7 +21,23 @@ MCP server local, giới hạn quyền, cho phép ChatGPT hoặc MCP client đ�
 - Corepack
 - pnpm 11.19.0 (được khóa trong `packageManager`)
 
-## Cài nhanh
+## Cách dùng dễ nhất
+
+Sau khi đã cài Node.js 22+, mở thư mục project và nhấp đúp:
+
+- macOS: `Start ChatGPT Local.command`
+- Windows: `Start ChatGPT Local.cmd`
+- Linux: chạy `./app.sh`
+
+Lần đầu, giao diện sẽ tự mở:
+
+1. Bấm **Chọn thư mục**.
+2. Chọn project muốn làm việc.
+3. Bấm **Bắt đầu sử dụng**.
+
+App tự cài dependency nếu cần, tự tạo token, tự cấu hình và tự đăng nhập dashboard. Những lần sau chỉ cần mở lại launcher.
+
+## Cách dùng bằng Terminal
 
 ```bash
 corepack enable
@@ -32,7 +48,7 @@ corepack pnpm app
 
 `setup:local` tạo `.env`, token mạnh và registry task tại `<workspace>/.local-coder/tasks.json`. File `.env` hiện có sẽ không bị ghi đè.
 
-Dashboard mặc định: `http://127.0.0.1:3001/ui`. Mật khẩu là `ADMIN_TOKEN` trong `.env`.
+Dashboard mặc định: `http://127.0.0.1:3001/ui`. Launcher tự đăng nhập bằng mã dùng một lần; `ADMIN_TOKEN` trong `.env` chỉ dùng khi bạn mở dashboard thủ công hoặc phiên đăng nhập đã hết hạn.
 
 macOS/Linux có thể dùng `./app.sh`; Windows dùng `.\app.ps1`. Cả hai sẽ mở dashboard nếu server đã chạy, hoặc start server rồi mở dashboard.
 
@@ -41,6 +57,18 @@ macOS/Linux có thể dùng `./app.sh`; Windows dùng `.\app.ps1`. Cả hai sẽ
 Cho sử dụng cá nhân/private, dùng [Secure MCP Tunnel](docs/secure-tunnel.md): server vẫn chỉ listen localhost và tunnel client tạo kết nối HTTPS outbound tới OpenAI. Không cần đặt `MCP_TOKEN` trong URL public.
 
 Public Cloudflare/Pinggy tunnel trong dashboard được giữ như chế độ thử nghiệm legacy. Muốn tạo URL `/mcp/<token>` phải chủ động đặt `ALLOW_URL_TOKEN=true`; token trong URL có thể lọt vào history hoặc log của nhà cung cấp.
+
+Để dùng chế độ **URL nhanh tự động** trên một máy cá nhân, cấu hình:
+
+```env
+ALLOW_URL_TOKEN=true
+AUTO_START_TUNNEL=true
+TUNNEL_PROVIDER=cloudflared
+```
+
+Khi mở launcher, app tự chạy tunnel và dashboard tự hiện URL đầy đủ để sao chép. Không chia sẻ URL này vì nó chứa token truy cập. Mặc định của bản phân phối vẫn tắt chế độ này.
+
+Không thể có một URL HTTPS công khai mà hoàn toàn không có hạ tầng trung gian. Ba lựa chọn thực tế là Cloudflare/Pinggy (URL tạm), VPS/domain riêng (URL ổn định), hoặc OpenAI Secure MCP Tunnel (không tạo URL public; chọn **Tunnel** trong ChatGPT).
 
 Nếu triển khai MCP server public hoặc cho nhiều người dùng, static token của project này không đủ: cần HTTPS ổn định và OAuth 2.1/PKCE theo yêu cầu MCP/ChatGPT.
 

@@ -10,6 +10,10 @@ export interface DesktopLaunchOptions {
   projectRoot?: string;
 }
 
+export function desktopDisplayUrl(adminPort: number): string {
+  return `http://127.0.0.1:${adminPort}/ui`;
+}
+
 export function buildDesktopAppCommand(options: DesktopLaunchOptions): { program: string; args: string[] } {
   const platform = options.platform ?? process.platform;
   const projectRoot = options.projectRoot ?? process.cwd();
@@ -37,12 +41,16 @@ export function buildDesktopAppCommand(options: DesktopLaunchOptions): { program
   };
 }
 
-export async function launchDesktopApp(adminPort = Number(process.env.ADMIN_PORT || "3001")): Promise<void> {
-  const url = `http://127.0.0.1:${adminPort}/ui`;
+export async function launchDesktopApp(
+  adminPort = Number(process.env.ADMIN_PORT || "3001"),
+  route = "/ui",
+): Promise<void> {
+  const safeRoute = route.startsWith("/") && !route.startsWith("//") ? route : "/ui";
+  const url = `http://127.0.0.1:${adminPort}${safeRoute}`;
 
   process.stdout.write([
     "🖥️  Đang mở dashboard Local Coder...",
-    `📍 Dashboard URL: ${url}`,
+    `📍 Dashboard: ${desktopDisplayUrl(adminPort)}`,
     "💡 macOS dùng app WebKit nếu đã build; Windows/Linux dùng trình duyệt mặc định.",
     "",
   ].join("\n"));

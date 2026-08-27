@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -eu
 
+if [ ! -x "node_modules/.bin/tsc" ]; then
+  echo "Đang cài thành phần cần thiết (chỉ làm một lần)..."
+  corepack pnpm install --frozen-lockfile
+fi
+
 # Biên dịch Native macOS App nếu chưa có
 if [ "$(uname)" = "Darwin" ] && [ ! -f "Local Coder.app/Contents/MacOS/LocalCoder" ]; then
   echo "🔨 Đang biên dịch ứng dụng Native macOS (Cocoa + WebKit)..."

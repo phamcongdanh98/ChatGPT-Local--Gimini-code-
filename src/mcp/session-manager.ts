@@ -57,6 +57,20 @@ export class McpSessionManager {
         return this.jsonRpcError(response, 400, "Initialize request required when no MCP session id is present");
       }
       if (this.sessions.size + this.pendingInitializations >= this.maxSessions) {
+        let oldestId: string | undefined;
+        let oldestSeen = Infinity;
+        for (const [id, session] of this.sessions) {
+          if (session.lastSeen < oldestSeen) {
+            oldestSeen = session.lastSeen;
+            oldestId = id;
+          }
+        }
+        if (oldestId) {
+          const sessionToEvict = this.sessions.get(oldestId)!;
+          await this.closeSession(oldestId, sessionToEvict);
+        }
+      }
+      if (this.sessions.size + this.pendingInitializations >= this.maxSessions) {
         return this.jsonRpcError(response, 429, "MCP session limit reached; close an existing session and retry");
       }
       this.pendingInitializations += 1;

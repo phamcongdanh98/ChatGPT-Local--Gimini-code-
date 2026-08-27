@@ -5,12 +5,15 @@ export const APP_NAME = "chatgpt-local-secure";
 export const APP_VERSION = "3.0.0";
 
 export type PermissionMode = "read-only" | "workspace-write";
+export type TunnelProvider = "cloudflared" | "pinggy";
 
 export interface AppConfig {
   host: string;
   port: number;
   token: string;
   allowUrlToken: boolean;
+  autoStartTunnel: boolean;
+  tunnelProvider: TunnelProvider;
   workspaceRoots: string[];
   primaryRoot: string;
   stateDir: string;
@@ -59,6 +62,14 @@ function permissionMode(value: string | undefined): PermissionMode {
   const normalized = (value || "workspace-write").trim().toLowerCase();
   if (normalized !== "read-only" && normalized !== "workspace-write") {
     throw new Error("PERMISSION_MODE must be read-only or workspace-write");
+  }
+  return normalized;
+}
+
+function tunnelProvider(value: string | undefined): TunnelProvider {
+  const normalized = (value || "cloudflared").trim().toLowerCase();
+  if (normalized !== "cloudflared" && normalized !== "pinggy") {
+    throw new Error("TUNNEL_PROVIDER must be cloudflared or pinggy");
   }
   return normalized;
 }
@@ -116,6 +127,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, _cwd = process.
     port: integer(env.PORT, 3000, { min: 0, max: 65535, name: "PORT" }),
     token,
     allowUrlToken: bool(env.ALLOW_URL_TOKEN, false),
+    autoStartTunnel: bool(env.AUTO_START_TUNNEL, false),
+    tunnelProvider: tunnelProvider(env.TUNNEL_PROVIDER),
     workspaceRoots: roots,
     primaryRoot,
     stateDir,

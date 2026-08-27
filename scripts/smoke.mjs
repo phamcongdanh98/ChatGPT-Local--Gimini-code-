@@ -34,7 +34,8 @@ const config = loadConfig({
   ADMIN_TOKEN: adminToken,
   ALLOW_URL_TOKEN: "false",
 });
-const app = await startApplication(config, { envFile, pickFolder: async () => root });
+const handoffToken = "smoke-handoff-token-".padEnd(40, "z");
+const app = await startApplication(config, { envFile, pickFolder: async () => root, adminHandoffToken: handoffToken });
 const client = new Client({ name: "local-coder-smoke", version: "1.0.0" });
 const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${app.port}/mcp`), {
   requestInit: { headers: { Authorization: `Bearer ${token}` } },
@@ -65,6 +66,11 @@ try {
   const adminAuthorization = `Basic ${Buffer.from(`admin:${adminToken}`).toString("base64")}`;
   const adminHeaders = { Authorization: adminAuthorization };
   const adminActionHeaders = { ...adminHeaders, "X-Local-Coder-Admin": "1" };
+  const handoff = await fetch(`${adminBase}/bootstrap-session/${handoffToken}`, { redirect: "manual" });
+  assert.equal(handoff.status, 303);
+  assert.equal(handoff.headers.get("location"), "/ui");
+  assert.match(handoff.headers.get("set-cookie") ?? "", /HttpOnly; SameSite=Strict/);
+  assert.equal((await fetch(`${adminBase}/bootstrap-session/${handoffToken}`)).status, 404);
   const unauthenticatedDashboard = await fetch(adminBase, { redirect: "manual" });
   assert.equal(unauthenticatedDashboard.status, 303);
   assert.equal(unauthenticatedDashboard.headers.get("location"), "/login");

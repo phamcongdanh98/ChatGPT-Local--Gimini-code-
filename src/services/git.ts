@@ -77,21 +77,38 @@ export class GitService {
   private async execute(cwd: string, args: string[]): Promise<ProcessResult> {
     const hooksDir = path.join(this.stateDir, "runtime-home", "empty-git-hooks");
     await fs.mkdir(hooksDir, { recursive: true, mode: 0o700 });
+    const credentialArgs: string[] = [];
+    if (process.platform === "darwin") {
+      credentialArgs.push("-c", "credential.helper=osxkeychain");
+    } else if (process.platform === "win32") {
+      credentialArgs.push("-c", "credential.helper=manager");
+    }
+    credentialArgs.push(
+      "-c", "credential.https://github.com.helper=!gh auth git-credential",
+      "-c", "credential.https://gist.github.com.helper=!gh auth git-credential"
+    );
+    const authEnv: Record<string, string> = {
+      GIT_TERMINAL_PROMPT: "0",
+      GIT_PAGER: "cat",
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+    };
+    if (process.env.HOME) authEnv.HOME = process.env.HOME;
+    if (process.env.USER) authEnv.USER = process.env.USER;
+    if (process.env.LOGNAME) authEnv.LOGNAME = process.env.LOGNAME;
+    if (process.env.SSH_AUTH_SOCK) authEnv.SSH_AUTH_SOCK = process.env.SSH_AUTH_SOCK;
+
     return await runProcess({
       program: "git",
       args: [
         "-c", `core.hooksPath=${hooksDir}`,
         "-c", "core.fsmonitor=false",
         "-c", "commit.gpgSign=false",
+        ...credentialArgs,
         ...args,
       ],
       cwd,
-      env: safeEnvironment(this.stateDir, {
-        GIT_TERMINAL_PROMPT: "0",
-        GIT_PAGER: "cat",
-        GIT_CONFIG_NOSYSTEM: "1",
-        GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
-      }),
+      env: safeEnvironment(this.stateDir, authEnv),
       timeoutMs: this.timeoutMs,
       outputMaxBytes: this.outputMaxBytes,
     });

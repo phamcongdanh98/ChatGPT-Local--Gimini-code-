@@ -24,4 +24,5 @@ This repository implements a least-privilege local coding MCP server. Preserve t
 - Keep health responses free of workspace paths and authentication details.
 - Generic shell, destructive tools and remote Git remain opt-in.
 - URL-token authentication remains off by default; Secure MCP Tunnel is preferred.
+- Keep first-run setup usable without editing `.env` or copying permanent tokens; auto-login handoff tokens must be random, in-memory and one-time.
 - Add a regression test when changing path containment, auth, process lifecycle, tool annotations or output limits.
