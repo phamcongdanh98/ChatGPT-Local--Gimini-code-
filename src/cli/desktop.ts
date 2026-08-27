@@ -24,7 +24,7 @@ export function buildDesktopAppCommand(options: DesktopLaunchOptions): { program
     if (!fs.existsSync(localAppPath)) return { program: "/usr/bin/open", args: [url] };
     return {
       program: "/usr/bin/open",
-      args: ["-a", localAppPath, "--args", url],
+      args: ["-a", localAppPath, "--args", url, String(process.pid)],
     };
   }
 

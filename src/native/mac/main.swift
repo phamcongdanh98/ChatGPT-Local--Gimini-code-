@@ -4,6 +4,7 @@ import WebKit
 class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
     var window: NSWindow!
     var webView: WKWebView!
+    var parentPid: pid_t = 0
 
     func setupMainMenu() {
         let mainMenu = NSMenu()
@@ -90,6 +91,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         if CommandLine.arguments.count > 1 {
             targetUrl = CommandLine.arguments[1]
         }
+        if CommandLine.arguments.count > 2, let pid = Int32(CommandLine.arguments[2]) {
+            parentPid = pid
+        }
 
         if let url = URL(string: targetUrl) {
             webView.load(URLRequest(url: url))
@@ -100,7 +104,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        if parentPid > 0 {
+            kill(parentPid, SIGTERM)
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        if parentPid > 0 {
+            kill(parentPid, SIGTERM)
+        }
         return true
     }
 
