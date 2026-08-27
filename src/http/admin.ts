@@ -390,15 +390,20 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
   app.post("/api/tunnel/start", requireAdminAction, json, asyncRoute(async (request, response) => {
     const config = dependencies.config();
     const provider = typeof request.body?.provider === "string" ? request.body.provider : config.tunnelProvider;
+    const cloudflareToken = typeof request.body?.cloudflareToken === "string" ? request.body.cloudflareToken : config.cloudflareTunnelToken;
+    const ngrokToken = typeof request.body?.ngrokToken === "string" ? request.body.ngrokToken : config.ngrokAuthToken;
+    const ngrokDomain = typeof request.body?.ngrokDomain === "string" ? request.body.ngrokDomain : config.ngrokDomain;
+    const persistentDomain = typeof request.body?.persistentDomain === "string" ? request.body.persistentDomain : config.persistentTunnelDomain;
+    const autoReconnect = typeof request.body?.autoReconnect === "boolean" ? request.body.autoReconnect : config.autoReconnectTunnel;
     try {
       response.status(202).json(await dependencies.tunnel.start({
         provider,
         port: dependencies.mcpPort,
-        cloudflareToken: config.cloudflareTunnelToken,
-        ngrokToken: config.ngrokAuthToken,
-        ngrokDomain: config.ngrokDomain,
-        persistentDomain: config.persistentTunnelDomain,
-        autoReconnect: config.autoReconnectTunnel,
+        cloudflareToken,
+        ngrokToken,
+        ngrokDomain,
+        persistentDomain,
+        autoReconnect,
       }));
     } catch (error) {
       response.status(409).json({ error: error instanceof Error ? error.message : "Không thể mở tunnel" });

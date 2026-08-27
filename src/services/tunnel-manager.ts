@@ -118,10 +118,19 @@ export class TunnelManager {
       ...(initialUrl ? { publicUrl: initialUrl } : {}),
     };
 
+    const spawnEnv = tunnelEnvironment(process.env);
+    if (process.platform === "darwin" && spawnEnv.PATH) {
+      const paths = spawnEnv.PATH.split(":");
+      for (const p of ["/opt/homebrew/bin", "/usr/local/bin"]) {
+        if (!paths.includes(p)) paths.unshift(p);
+      }
+      spawnEnv.PATH = paths.join(":");
+    }
+
     const child = this.spawnTunnel(command.command, command.args, {
       stdio: ["ignore", "pipe", "pipe"],
       shell: false,
-      env: tunnelEnvironment(process.env),
+      env: spawnEnv,
       windowsHide: true,
     });
     this.child = child;
