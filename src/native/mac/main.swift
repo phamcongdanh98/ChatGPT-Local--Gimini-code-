@@ -49,6 +49,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenu()
 
+        if let iconUrl = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let iconImage = NSImage(contentsOf: iconUrl) {
+            NSApp.applicationIconImage = iconImage
+        } else if let iconImage = NSImage(contentsOfFile: "src/assets/AppIcon.icns") ?? NSImage(contentsOfFile: "src/assets/logo.png") {
+            NSApp.applicationIconImage = iconImage
+        }
+
         let width: CGFloat = 1120
         let height: CGFloat = 800
         let screenSize = NSScreen.main?.frame.size ?? CGSize(width: width, height: height)
