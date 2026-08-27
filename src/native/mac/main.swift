@@ -1,7 +1,7 @@
 import Cocoa
 import WebKit
 
-class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, NSWindowDelegate {
     var window: NSWindow!
     var webView: WKWebView!
     var statusItem: NSStatusItem!
@@ -16,12 +16,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Về Local Coder", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(withTitle: "Ẩn vào Menu Bar", action: #selector(hideToTray), keyEquivalent: "w")
         appMenu.addItem(withTitle: "Ẩn Local Coder", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(withTitle: "Ẩn ứng dụng khác", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(withTitle: "Hiện tất cả", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(withTitle: "Thoát Local Coder", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Thoát Local Coder", action: #selector(terminateApp), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
@@ -43,6 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         let windowMenu = NSMenu(title: "Cửa sổ")
         windowMenu.addItem(withTitle: "Thu nhỏ", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         windowMenu.addItem(withTitle: "Phóng to", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(withTitle: "Đóng & Ẩn vào Menu Bar", action: #selector(hideToTray), keyEquivalent: "w")
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)
 
@@ -62,6 +64,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             } else {
                 button.title = "🛡️"
             }
+            button.action = #selector(statusItemClicked)
+            button.target = self
         }
 
         let menu = NSMenu()
@@ -70,20 +74,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         menu.addItem(statusTitle)
         menu.addItem(NSMenuItem.separator())
 
-        menu.addItem(withTitle: "Hiện / Ẩn Dashboard", action: #selector(toggleMainWindow), keyEquivalent: "d")
+        menu.addItem(withTitle: "Mở Dashboard", action: #selector(showMainWindow), keyEquivalent: "o")
+        menu.addItem(withTitle: "Ẩn cửa sổ", action: #selector(hideToTray), keyEquivalent: "h")
         menu.addItem(withTitle: "Sao chép URL Dashboard", action: #selector(copyDashboardUrl), keyEquivalent: "c")
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Thoát Local Secure", action: #selector(terminateApp), keyEquivalent: "q")
+        menu.addItem(withTitle: "Thoát hoàn toàn Local Secure", action: #selector(terminateApp), keyEquivalent: "q")
 
         statusItem.menu = menu
     }
 
+    @objc func statusItemClicked() {
+        toggleMainWindow()
+    }
+
+    @objc func showMainWindow() {
+        NSApp.setActivationPolicy(.regular)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc func hideToTray() {
+        window.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
+    }
+
     @objc func toggleMainWindow() {
-        if window.isVisible {
-            window.orderOut(nil)
+        if window.isVisible && NSApp.isActive {
+            hideToTray()
         } else {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            showMainWindow()
         }
     }
 
@@ -94,7 +113,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
 
     @objc func terminateApp() {
+        if parentPid > 0 {
+            kill(parentPid, SIGTERM)
+        }
         NSApplication.shared.terminate(nil)
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        hideToTray()
+        return false
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -126,6 +153,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         window.title = "Local Coder"
         window.minSize = NSSize(width: 860, height: 600)
         window.center()
+        window.delegate = self
 
         let config = WKWebViewConfiguration()
         let prefs = WKWebpagePreferences()
@@ -163,10 +191,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        if parentPid > 0 {
-            kill(parentPid, SIGTERM)
-        }
-        return true
+        return false
     }
 
     // MARK: - WKUIDelegate (Xử lý các hộp thoại Confirm / Alert của JavaScript)
