@@ -18,9 +18,11 @@ export function buildFolderPickerCommand(platform = process.platform): FolderPic
       program: "powershell.exe",
       args: [
         "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
         "-STA",
         "-Command",
-        "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; if($d.ShowDialog() -eq 'OK'){[Console]::Write($d.SelectedPath)}",
+        "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $f=New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description='Chọn thư mục project cho Local Coder'; $f.ShowNewFolderButton=$true; $t=New-Object System.Windows.Forms.Form; $t.TopMost=$true; $t.ShowInTaskbar=$false; $r=$f.ShowDialog($t); $t.Dispose(); if($r -eq 'OK'){[Console]::Write($f.SelectedPath)}",
       ],
     };
   }
@@ -38,7 +40,7 @@ export async function pickWorkspaceFolder(platform = process.platform): Promise<
     args: command.args,
     cwd: process.cwd(),
     env: tunnelEnvironment(process.env),
-    timeoutMs: 2 * 60 * 1000,
+    timeoutMs: 45 * 1000,
     outputMaxBytes: 8 * 1024,
   });
   if (result.timedOut) throw new Error("Hộp chọn thư mục đã hết thời gian chờ");

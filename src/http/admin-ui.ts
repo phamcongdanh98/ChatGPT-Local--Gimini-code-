@@ -785,14 +785,21 @@ q("#pick-folder").addEventListener("click",async()=>{
   const button=q("#pick-folder");
   button.disabled=true;
   button.textContent="Đang chờ…";
+  toast("Đang mở hộp chọn thư mục trên máy tính…");
   try{
-    const result=await api("/api/folder-picker",{method:"POST"});
-    if(result.selected){
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),40000);
+    const result=await api("/api/folder-picker",{method:"POST",signal:controller.signal});
+    clearTimeout(timeout);
+    if(result && result.selected){
       q("#workspace-path").value=result.selected;
       q("#save-state").textContent="Chưa lưu";
-    }else toast("Bạn chưa chọn thư mục");
+      toast("Đã chọn: "+result.selected);
+    }else{
+      toast("Bạn chưa chọn thư mục");
+    }
   }catch(error){
-    toast("Không mở được hộp chọn. Bạn có thể dán đường dẫn vào ô.",true);
+    toast("Không mở được hộp chọn hoặc đã hết thời gian. Bạn có thể dán đường dẫn trực tiếp vào ô.",true);
   }finally{
     button.disabled=false;
     button.textContent="📁 Chọn thư mục";
