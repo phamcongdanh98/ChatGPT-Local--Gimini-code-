@@ -1,6 +1,12 @@
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path "node_modules\.bin\tsc.cmd")) {
+try {
+  corepack enable
+} catch {
+  # Bỏ qua nếu corepack đã được bật hoặc không đủ quyền Admin
+}
+
+if ((-not (Test-Path "node_modules\.bin\tsc.cmd")) -and (-not (Test-Path "node_modules\.bin\tsc"))) {
   Write-Host "Đang cài thành phần cần thiết (chỉ làm một lần)..."
   corepack pnpm install --frozen-lockfile
 }
