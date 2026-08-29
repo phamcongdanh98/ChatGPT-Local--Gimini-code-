@@ -58,6 +58,16 @@ export function extractTunnelUrl(output: string, provider: TunnelProvider, persi
   return undefined;
 }
 
+export function extractTunnelError(output: string, provider: TunnelProvider): string | undefined {
+  const plain = output.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, " ");
+  const errMatch = /err="([^"]+)"/i.exec(plain) || /ERROR:\s+([^\n\r]+)/i.exec(plain) || /ERR_NGROK_\d+:[^\n\r]+/i.exec(plain);
+  if (errMatch) {
+    const raw = (errMatch[1] || errMatch[0] || "").replace(/\\n/g, " ").replace(/\\r/g, "").trim();
+    if (raw) return raw.slice(0, 250);
+  }
+  return undefined;
+}
+
 export class TunnelManager {
   private child: TunnelChild | undefined;
   private current: TunnelStatus = { state: "stopped" };
@@ -150,6 +160,7 @@ export class TunnelManager {
       if (this.child !== child) return;
       this.clearStartupTimer();
       this.child = undefined;
+      const lastOutput = this.output;
       this.output = "";
 
       if (this.current.state === "failed") {
@@ -163,11 +174,17 @@ export class TunnelManager {
         return;
       }
 
-      this.current = { state: "failed", provider, error: `${provider} đã dừng (exit ${code ?? "unknown"})` };
+      const specificError = extractTunnelError(lastOutput, provider);
+      this.current = {
+        state: "failed",
+        provider,
+        error: specificError || `${provider} đã dừng (exit ${code ?? "unknown"})`,
+      };
 
-      // Auto reconnect if enabled and not manually stopped
+      // Auto reconnect if enabled and not manually stopped and not auth error
+      const isAuthError = Boolean(specificError && /authtoken|authentication|credentials|not authenticated|ERR_NGROK_4018|ERR_NGROK_105/i.test(specificError));
       const shouldReconnect = options.autoReconnect ?? (process.env.AUTO_RECONNECT_TUNNEL !== "false");
-      if (shouldReconnect && !this.manualStop) {
+      if (shouldReconnect && !this.manualStop && !isAuthError) {
         this.scheduleReconnect();
       }
     });

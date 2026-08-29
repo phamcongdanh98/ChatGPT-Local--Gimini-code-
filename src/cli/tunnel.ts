@@ -63,8 +63,16 @@ export function buildTunnelCommand(
 
   if (provider === "ngrok") {
     const args = ["http", String(port)];
-    if (ngrokDomain) args.push("--domain", ngrokDomain);
-    if (ngrokToken) args.push("--authtoken", ngrokToken);
+    if (ngrokDomain) {
+      const cleanDomain = ngrokDomain.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+      if (cleanDomain) {
+        args.push("--url", `https://${cleanDomain}`);
+      }
+    }
+    if (ngrokToken) {
+      args.push("--authtoken", ngrokToken.trim());
+    }
+    args.push("--log", "stdout", "--log-format", "logfmt");
     return {
       command: platform === "win32" ? "ngrok.exe" : "ngrok",
       args,

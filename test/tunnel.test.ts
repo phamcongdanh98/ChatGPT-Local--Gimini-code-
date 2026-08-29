@@ -44,7 +44,7 @@ test("tunnel command forwards only the configured MCP port", () => {
   });
   assert.deepEqual(buildTunnelCommand("ngrok", 3000, { ngrokDomain: "custom.ngrok-free.app", ngrokToken: "tok123" }), {
     command: "ngrok",
-    args: ["http", "3000", "--domain", "custom.ngrok-free.app", "--authtoken", "tok123"],
+    args: ["http", "3000", "--url", "https://custom.ngrok-free.app", "--authtoken", "tok123", "--log", "stdout", "--log-format", "logfmt"],
   });
 });
 
