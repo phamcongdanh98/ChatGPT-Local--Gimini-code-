@@ -111,6 +111,15 @@ export class TunnelManager {
       if (token) {
         await ensureNgrokTokenConfig(token);
       }
+      try {
+        const { exec } = await import("node:child_process");
+        if (process.platform === "win32") {
+          exec("taskkill /F /IM ngrok.exe");
+        } else {
+          exec("pkill -9 -f ngrok");
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      } catch {}
     }
     const command = buildTunnelCommand(provider, options.port, {
       cloudflareToken: options.cloudflareToken,
@@ -259,6 +268,14 @@ export class TunnelManager {
     if (this.child === child) this.child = undefined;
     this.output = "";
     this.current = { state: "stopped" };
+    try {
+      const { exec } = await import("node:child_process");
+      if (process.platform === "win32") {
+        exec("taskkill /F /IM ngrok.exe");
+      } else {
+        exec("pkill -9 -f ngrok");
+      }
+    } catch {}
     return this.status();
   }
 
