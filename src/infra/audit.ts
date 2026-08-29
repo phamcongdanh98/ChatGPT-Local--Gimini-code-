@@ -14,6 +14,15 @@ export interface AuditEvent {
   detail?: Record<string, string | number | boolean | null>;
 }
 
+export interface AuditAnalytics {
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  topTools: Array<{ name: string; count: number; percentage: number }>;
+  avgDurationMs: number;
+  recentActivity: Array<{ time: string; tool: string; action: string; outcome: string }>;
+}
+
 export class AuditLog extends EventEmitter {
   private readonly events: AuditEvent[] = [];
   private readonly filePath: string;
@@ -79,5 +88,52 @@ export class AuditLog extends EventEmitter {
 
   recent(limit = 50): AuditEvent[] {
     return this.events.slice(-Math.max(1, Math.min(limit, 200))).reverse();
+  }
+
+  getAnalytics(): AuditAnalytics {
+    const totalCalls = this.events.length;
+    let successfulCalls = 0;
+    let failedCalls = 0;
+    let totalDuration = 0;
+    let durationCount = 0;
+    const toolCounts: Record<string, number> = {};
+
+    for (const event of this.events) {
+      if (event.outcome === "ok") successfulCalls++;
+      else failedCalls++;
+
+      if (typeof event.durationMs === "number" && event.durationMs > 0) {
+        totalDuration += event.durationMs;
+        durationCount++;
+      }
+
+      toolCounts[event.tool] = (toolCounts[event.tool] || 0) + 1;
+    }
+
+    const topTools = Object.entries(toolCounts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percentage: totalCalls > 0 ? Math.round((count / totalCalls) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const avgDurationMs = durationCount > 0 ? Math.round(totalDuration / durationCount) : 0;
+    const recentActivity = this.recent(10).map((e) => ({
+      time: e.timestamp,
+      tool: e.tool,
+      action: e.action,
+      outcome: e.outcome,
+    }));
+
+    return {
+      totalCalls,
+      successfulCalls,
+      failedCalls,
+      topTools,
+      avgDurationMs,
+      recentActivity,
+    };
   }
 }

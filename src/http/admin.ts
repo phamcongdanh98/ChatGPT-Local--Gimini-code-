@@ -10,6 +10,8 @@ import type { AdminSettingsInput } from "../services/admin-settings.js";
 import { canonicalWorkspace, getRecentWorkspaces, parseAdminSettings, recordRecentWorkspace } from "../services/admin-settings.js";
 import { detectProjectTaskPresets } from "../services/task-presets.js";
 import { pickWorkspaceFolder } from "../services/folder-picker.js";
+import { createSandboxBranch, discardSandboxBranch, getGitSandboxStatus, mergeSandboxBranch } from "../services/git-sandbox.js";
+import { generateQRCodeSVG } from "../lib/qrcode.js";
 import type { TaskRunner } from "../services/task-runner.js";
 import type { TunnelManager } from "../services/tunnel-manager.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -405,6 +407,21 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
     response.json({ workspaces: list });
   }));
   app.get("/api/audit", (_request, response) => response.json({ events: dependencies.audit().recent(100) }));
+  app.get("/api/analytics", (_request, response) => response.json(dependencies.audit().getAnalytics()));
+
+  app.get("/api/git/sandbox", asyncRoute(async (_request, response) => {
+    const config = dependencies.config();
+    response.json(await getGitSandboxStatus(config.primaryRoot));
+  }));
+
+  app.get("/api/qrcode", (request, response) => {
+    const url = typeof request.query.url === "string" ? request.query.url : "";
+    if (!url) {
+      response.status(400).send("URL parameter required");
+      return;
+    }
+    response.type("svg").send(generateQRCodeSVG(url));
+  });
 
   app.get("/api/events", (request, response) => {
     response.setHeader("Content-Type", "text/event-stream");
@@ -490,6 +507,40 @@ export function createAdminApp(dependencies: AdminDependencies): Express {
     await fs.promises.writeFile(tasksFile, JSON.stringify(currentTasks, null, 2), { encoding: "utf8", mode: 0o600 });
     response.json({ ok: true, tasks: await dependencies.tasks().list() });
   }));
+
+  app.post("/api/git/sandbox/create", requireAdminAction, json, asyncRoute(async (request, response) => {
+    try {
+      const name = typeof request.body?.name === "string" ? request.body.name : undefined;
+      const res = await createSandboxBranch(dependencies.config().primaryRoot, name);
+      await dependencies.audit().record({ tool: "git_sandbox", action: "create_branch", outcome: "ok", target: res.branch });
+      response.json(res);
+    } catch (error) {
+      response.status(400).json({ error: error instanceof Error ? error.message : "Không thể tạo nhánh AI Sandbox" });
+    }
+  }));
+
+  app.post("/api/git/sandbox/merge", requireAdminAction, json, asyncRoute(async (request, response) => {
+    try {
+      const targetBranch = typeof request.body?.targetBranch === "string" ? request.body.targetBranch : "main";
+      const res = await mergeSandboxBranch(dependencies.config().primaryRoot, targetBranch);
+      await dependencies.audit().record({ tool: "git_sandbox", action: "merge_branch", outcome: "ok", target: targetBranch });
+      response.json(res);
+    } catch (error) {
+      response.status(400).json({ error: error instanceof Error ? error.message : "Không thể merge nhánh AI Sandbox" });
+    }
+  }));
+
+  app.post("/api/git/sandbox/discard", requireAdminAction, json, asyncRoute(async (request, response) => {
+    try {
+      const targetBranch = typeof request.body?.targetBranch === "string" ? request.body.targetBranch : "main";
+      const res = await discardSandboxBranch(dependencies.config().primaryRoot, targetBranch);
+      await dependencies.audit().record({ tool: "git_sandbox", action: "discard_branch", outcome: "ok", target: targetBranch });
+      response.json(res);
+    } catch (error) {
+      response.status(400).json({ error: error instanceof Error ? error.message : "Không thể hủy nhánh AI Sandbox" });
+    }
+  }));
+
   app.post("/api/secret", requireAdminAction, (_request, response) => {
     const tunnel = dependencies.tunnel.status();
     const token = dependencies.config().token;

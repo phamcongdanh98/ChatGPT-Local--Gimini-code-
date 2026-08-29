@@ -141,6 +141,55 @@ export function createMcpServer(services: Services): McpServer {
     annotations: readOnly,
   }, async (input) => await audited(audit, "grep_files", "search", input.path, async () => await files.grep(input)));
 
+  server.registerTool("workspace_symbols", {
+    title: "Search Workspace Symbols",
+    description: "Search for function, class, interface, and type definitions across code files matching a query.",
+    inputSchema: {
+      path: z.string().optional().default("."),
+      query: z.string().min(1).max(128),
+      maxResults: z.number().int().min(1).max(100).optional().default(50),
+    },
+    annotations: readOnly,
+  }, async ({ path: targetPath, query, maxResults }) => await audited(audit, "workspace_symbols", "search", targetPath, async () => {
+    const globResult = await files.glob(targetPath, "**/*.{ts,js,tsx,jsx,py,rs,go,swift,java,cpp,c,h}", 200);
+    const matches = Array.isArray(globResult["matches"]) ? (globResult["matches"] as string[]) : [];
+    const symbols: Array<{ file: string; line: number; name: string; kind: string; snippet: string }> = [];
+    const symbolRegex = /(?:class|function|interface|type|enum|def|fn|func|struct|protocol)\s+([A-Za-z0-9_]+)/;
+    const lowerQuery = query.toLowerCase();
+
+    for (const file of matches) {
+      if (symbols.length >= maxResults) break;
+      try {
+        const readResult = await files.read(file, 0, 1000);
+        const content = typeof readResult["content"] === "string" ? readResult["content"] : "";
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i]!;
+          const match = symbolRegex.exec(line);
+          if (match && match[1] && match[1].toLowerCase().includes(lowerQuery)) {
+            const kind = line.trim().split(/\s+/)[0] || "symbol";
+            symbols.push({
+              file,
+              line: i + 1,
+              name: match[1],
+              kind,
+              snippet: line.trim().slice(0, 120),
+            });
+            if (symbols.length >= maxResults) break;
+          }
+        }
+      } catch {}
+    }
+    return { query, count: symbols.length, symbols };
+  }));
+
+  server.registerTool("git_diff_summary", {
+    title: "Git Diff Summary",
+    description: "Get a clean summary of modified, added, and deleted files in the local Git repository.",
+    inputSchema: { path: z.string().optional().default(".") },
+    annotations: readOnly,
+  }, async ({ path }) => await audited(audit, "git_diff_summary", "git-read", path, async () => processResult(await git.diff(path, false))));
+
   if (config.permissionMode === "workspace-write") {
     server.registerTool("write_file", {
       title: "Write File",

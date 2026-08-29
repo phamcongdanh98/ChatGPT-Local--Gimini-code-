@@ -94,6 +94,10 @@ export const ADMIN_HTML = `<!doctype html>
             <button id="copy-connector" class="button primary" disabled>Sao chép URL</button>
           </div>
           <small id="connector-hint">URL đầy đủ sẽ xuất hiện tại đây khi kết nối thành công.</small>
+          <div class="button-row" style="margin:8px 0 0">
+            <button id="show-qr-btn" class="button ghost" type="button" disabled>📱 Mã QR Mobile</button>
+            <button id="show-prompt-btn" class="button ghost" type="button">🧠 Custom Instructions</button>
+          </div>
         </label>
 
         <button id="test-connection" class="button ghost wide test-conn-btn">⚡ Kiểm tra kết nối Máy local ↔ ChatGPT</button>
@@ -133,6 +137,22 @@ export const ADMIN_HTML = `<!doctype html>
           <span class="recent-title">Dự án gần đây:</span>
           <div id="recent-list" class="recent-chips"></div>
         </div>
+
+        <div id="git-sandbox-section" class="sandbox-box">
+          <div class="sandbox-head">
+            <div>
+              <span class="sandbox-tag">🌿 AI GIT SANDBOX</span>
+              <strong id="sandbox-branch-text">Nhánh: main</strong>
+            </div>
+            <div id="sandbox-actions" class="sandbox-btns">
+              <button id="create-sandbox-btn" class="button ghost" type="button">＋ Tạo nhánh AI</button>
+              <button id="merge-sandbox-btn" class="button primary" type="button" hidden>✅ Gộp vào Main</button>
+              <button id="discard-sandbox-btn" class="button danger" type="button" hidden>🗑️ Hủy nhánh AI</button>
+            </div>
+          </div>
+          <small id="sandbox-desc">Cách ly thay đổi của AI trên một nhánh riêng để không ảnh hưởng code gốc.</small>
+        </div>
+
         <div class="permissions">
           <label class="toggle-row"><span><strong>Đọc code</strong><small>Luôn bật trong workspace đã chọn</small></span><input type="checkbox" checked disabled><i></i></label>
           <label class="toggle-row"><span><strong>Tự sửa code + chạy task + Git local</strong><small>Cho phép tạo/sửa file và chạy task trong allowlist</small></span><input id="allow-write" type="checkbox"><i></i></label>
@@ -145,6 +165,16 @@ export const ADMIN_HTML = `<!doctype html>
         </div>
         <button id="save-settings" class="button primary wide">Lưu cài đặt project</button>
         <p class="notice">Sau khi đổi quyền hoặc project: Refresh connector trong ChatGPT để nhận đúng danh sách tool.</p>
+      </article>
+    </section>
+
+    <section class="info-grid">
+      <article class="card compact" style="grid-column: span 2;">
+        <div class="card-head"><div><span class="step">ANALYTICS & INSIGHTS</span><h2>Thống kê Tool Calls & Hoạt động AI</h2></div><span id="analytics-total" class="count">0 cuộc gọi</span></div>
+        <div class="analytics-container">
+          <div id="analytics-bars" class="analytics-bars"></div>
+          <div id="analytics-stats" class="analytics-metrics"></div>
+        </div>
       </article>
     </section>
 
@@ -175,6 +205,35 @@ export const ADMIN_HTML = `<!doctype html>
         <div id="activity" class="rows"></div>
       </article>
     </section>
+
+    <!-- QR Code Modal -->
+    <div id="qr-modal" class="modal-backdrop" hidden>
+      <div class="modal-card small-modal">
+        <div class="modal-header">
+          <div><span class="step">MOBILE PAIRING</span><h2>Quét mã QR kết nối</h2></div>
+          <button id="close-qr-modal" class="button ghost" type="button">✕</button>
+        </div>
+        <div id="qr-modal-body" class="qr-content" style="text-align:center;padding:16px;"></div>
+        <small style="display:block;text-align:center;color:var(--muted);margin-bottom:12px;">Dùng camera quét để dán URL vào ChatGPT trên iPhone/Android</small>
+      </div>
+    </div>
+
+    <!-- Custom Instructions Modal -->
+    <div id="prompt-modal" class="modal-backdrop" hidden>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div><span class="step">PROMPT OPTIMIZER</span><h2>Custom Instructions cho ChatGPT</h2></div>
+          <button id="close-prompt-modal" class="button ghost" type="button">✕</button>
+        </div>
+        <div class="prompt-content" style="padding:16px;">
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Dán hướng dẫn này vào <b>ChatGPT → Settings → Custom Instructions</b> để AI tuân thủ quy tắc lập trình an toàn:</p>
+          <textarea id="custom-prompt-text" readonly style="width:100%;height:180px;background:#090d12;color:#82b5ff;border:1px solid var(--line);border-radius:10px;padding:12px;font:11px var(--mono);resize:vertical;"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+            <button id="copy-prompt-btn" class="button primary" type="button">📋 Sao chép 1-Click</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div id="diff-modal" class="modal-backdrop" hidden>
       <div class="modal-card">
@@ -275,7 +334,30 @@ export const ADMIN_STYLESHEET = `
 .clickable-row{cursor:pointer;transition:.15s}
 .clickable-row:hover{background:var(--panel2)}
 
-@media(max-width:850px){.main-grid,.info-grid{grid-template-columns:1fr}.hero{padding-top:32px}.header-actions .status-pill{display:none}}
+/* AI Git Sandbox */
+.sandbox-box{border:1px solid #234e40;background:#0d201a;border-radius:12px;padding:12px 14px;margin:10px 0 14px}
+.sandbox-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.sandbox-tag{display:inline-block;font:900 8.5px var(--sans);color:var(--green);letter-spacing:.08em;margin-bottom:2px}
+.sandbox-head strong{display:block;font-size:12px;color:var(--text);font-family:var(--mono)}
+.sandbox-btns{display:flex;gap:6px}
+.sandbox-box small{display:block;color:var(--muted);font-size:9.5px;line-height:1.4}
+
+/* Analytics */
+.analytics-container{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;padding:16px 20px 20px}
+.analytics-bars{display:flex;flex-direction:column;gap:9px}
+.analytics-bar-row{display:flex;flex-direction:column;gap:3px}
+.analytics-bar-head{display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono)}
+.analytics-bar-head span{color:var(--text)}
+.analytics-bar-head small{color:var(--muted)}
+.analytics-bar-bg{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.analytics-bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .4s ease}
+.analytics-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.metric-item{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:12px}
+.metric-item small{display:block;font-size:8.5px;color:var(--muted);margin-bottom:4px}
+.metric-item strong{display:block;font-size:14px;color:var(--green)}
+.small-modal{width:min(420px,100%)}
+
+@media(max-width:850px){.main-grid,.info-grid,.analytics-container{grid-template-columns:1fr}.hero{padding-top:32px}.header-actions .status-pill{display:none}}
 @media(max-width:560px){.page{width:min(100% - 20px,1120px)}.header{height:64px}.hero{padding:28px 2px 18px}.card{padding:15px}.compact .card-head{padding:15px 15px 0}.compact>p{padding:0 15px}.warning{margin:10px 15px 15px!important}.stats{padding:0 15px 15px}.row{padding:10px 15px}.input-action{flex-wrap:wrap}.input-action input{flex-basis:100%}.provider-tabs{grid-template-columns:1fr}.tunnel-action-row{flex-direction:column}.header-actions{gap:7px}}
 `;
 
@@ -453,6 +535,7 @@ function renderSecrets(){
   const connector=secret&&secret.connectorUrl?secret.connectorUrl:"";
   q("#connector-url").value=connector;
   q("#copy-connector").disabled=!connector;
+  q("#show-qr-btn").disabled=!connector;
   
   const hint=q("#connector-hint");
   hint.textContent=connector
@@ -668,6 +751,8 @@ async function load(){
     renderPresetTasks();
     renderRows();
     await syncConnectorUrl();
+    await loadSandbox();
+    await loadAnalytics();
   }catch(error){
     toast(error.message,true);
   }
@@ -896,6 +981,173 @@ q("#close-test-panel").addEventListener("click",()=>{
   q("#test-connection-panel").hidden=true;
 });
 
+async function loadSandbox(){
+  try{
+    const sandbox=await api("/api/git/sandbox");
+    const section=q("#git-sandbox-section");
+    if(!sandbox.isGitRepo){
+      section.hidden=true;
+      return;
+    }
+    section.hidden=false;
+    const branchText=q("#sandbox-branch-text");
+    const createBtn=q("#create-sandbox-btn");
+    const mergeBtn=q("#merge-sandbox-btn");
+    const discardBtn=q("#discard-sandbox-btn");
+    const desc=q("#sandbox-desc");
+
+    if(sandbox.isSandbox){
+      branchText.textContent="🤖 AI Sandbox: "+sandbox.currentBranch;
+      branchText.style.color="var(--green)";
+      createBtn.hidden=true;
+      mergeBtn.hidden=false;
+      discardBtn.hidden=false;
+      desc.textContent="Đang chạy trên nhánh cách ly. Bạn có thể Gộp vào Main hoặc Hủy sạch thay đổi bất cứ lúc nào.";
+    }else{
+      branchText.textContent="Nhánh: "+(sandbox.currentBranch||"main");
+      branchText.style.color="var(--text)";
+      createBtn.hidden=false;
+      mergeBtn.hidden=true;
+      discardBtn.hidden=true;
+      desc.textContent="Cách ly thay đổi của AI trên một nhánh riêng để không ảnh hưởng code gốc.";
+    }
+  }catch{}
+}
+
+async function loadAnalytics(){
+  try{
+    const data=await api("/api/analytics");
+    q("#analytics-total").textContent=data.totalCalls+" cuộc gọi";
+    const bars=q("#analytics-bars");
+    if(!data.topTools||!data.topTools.length){
+      bars.innerHTML="<small style='color:var(--muted);font-size:10px;'>Chưa có hoạt động tool call nào.</small>";
+    }else{
+      bars.replaceChildren(...data.topTools.map(t=>{
+        const row=el("div","analytics-bar-row");
+        const head=el("div","analytics-bar-head");
+        head.append(el("span","",t.name),el("small","",t.count+" lần ("+t.percentage+"%)"));
+        const bg=el("div","analytics-bar-bg");
+        const fill=el("div","analytics-bar-fill");
+        fill.style.width=t.percentage+"%";
+        bg.append(fill);
+        row.append(head,bg);
+        return row;
+      }));
+    }
+
+    const stats=q("#analytics-stats");
+    stats.replaceChildren(
+      createMetric("Thành công",data.successfulCalls+" lần","var(--green)"),
+      createMetric("Thời gian TB",data.avgDurationMs+" ms","var(--blue)"),
+      createMetric("Thất bại / Chặn",data.failedCalls+" lần",data.failedCalls>0?"var(--red)":"var(--muted)")
+    );
+  }catch{}
+}
+
+function createMetric(title,value,color){
+  const item=el("div","metric-item");
+  item.append(el("small","",title));
+  const val=el("strong","",value);
+  if(color)val.style.color=color;
+  item.append(val);
+  return item;
+}
+
+// AI Git Sandbox Event Listeners
+q("#create-sandbox-btn").addEventListener("click",async()=>{
+  const btn=q("#create-sandbox-btn");
+  btn.disabled=true;
+  try{
+    const res=await api("/api/git/sandbox/create",{method:"POST"});
+    toast("✓ Đã tạo và chuyển sang nhánh "+res.branch);
+    await loadSandbox();
+  }catch(e){
+    toast(e.message,true);
+  }finally{
+    btn.disabled=false;
+  }
+});
+
+q("#merge-sandbox-btn").addEventListener("click",async()=>{
+  if(!confirm("Bạn có chắc chắn muốn gộp toàn bộ thay đổi của AI vào nhánh chính không?"))return;
+  const btn=q("#merge-sandbox-btn");
+  btn.disabled=true;
+  try{
+    await api("/api/git/sandbox/merge",{method:"POST"});
+    toast("✓ Đã gộp thành công vào Main và dọn dẹp nhánh AI!");
+    await loadSandbox();
+    await load();
+  }catch(e){
+    toast(e.message,true);
+  }finally{
+    btn.disabled=false;
+  }
+});
+
+q("#discard-sandbox-btn").addEventListener("click",async()=>{
+  if(!confirm("CẢNH BÁO: Thao tác này sẽ XÓA TOÀN BỘ thay đổi của AI và quay về code gốc. Bạn có chắc không?"))return;
+  const btn=q("#discard-sandbox-btn");
+  btn.disabled=true;
+  try{
+    await api("/api/git/sandbox/discard",{method:"POST"});
+    toast("✓ Đã hủy toàn bộ thay đổi và quay về code gốc!");
+    await loadSandbox();
+    await load();
+  }catch(e){
+    toast(e.message,true);
+  }finally{
+    btn.disabled=false;
+  }
+});
+
+// QR Code Modal
+q("#show-qr-btn").addEventListener("click",async()=>{
+  const url=q("#connector-url").value;
+  if(!url)return;
+  const body=q("#qr-modal-body");
+  body.innerHTML="<p style='color:var(--muted);font-size:11px;'>Đang tạo mã QR…</p>";
+  q("#qr-modal").hidden=false;
+  try{
+    const res=await fetch("/api/qrcode?url="+encodeURIComponent(url));
+    const svg=await res.text();
+    body.innerHTML=svg;
+  }catch(e){
+    body.innerHTML="<p style='color:var(--red);font-size:11px;'>Lỗi tạo QR code</p>";
+  }
+});
+q("#close-qr-modal").addEventListener("click",()=>{q("#qr-modal").hidden=true});
+
+// Custom Instructions Modal
+const CUSTOM_PROMPT_GUIDE = [
+  "# Hướng dẫn Lập trình với ChatGPT Local Secure MCP",
+  "",
+  "Bạn đang kết nối với máy chủ MCP bảo mật của tôi. Hãy tuân thủ nghiêm ngặt các quy tắc sau:",
+  "1. Trước khi sửa code, luôn dùng 'read_file' hoặc 'workspace_symbols' để đọc và hiểu file liên quan.",
+  "2. Không tự ý tạo file mới nếu có thể sửa file hiện có.",
+  "3. Khi sửa code, luôn tạo thay đổi tối thiểu, tránh làm hỏng các tính năng cũ.",
+  "4. Tự động kiểm tra cú pháp và chạy test trong danh sách tasks allowlist sau khi sửa đổi.",
+  "5. Giải thích ngắn gọn, rõ ràng bằng tiếng Việt."
+].join("\\n");
+
+q("#show-prompt-btn").addEventListener("click",()=>{
+  q("#custom-prompt-text").value=CUSTOM_PROMPT_GUIDE;
+  q("#prompt-modal").hidden=false;
+});
+q("#close-prompt-modal").addEventListener("click",()=>{q("#prompt-modal").hidden=true});
+q("#copy-prompt-btn").addEventListener("click",async()=>{
+  try{
+    await copy(q("#custom-prompt-text").value,"Custom Instructions");
+    toast("✓ Đã sao chép Custom Instructions!");
+  }catch(e){
+    toast(e.message,true);
+  }
+});
+
+// Request Web Notification permission
+if("Notification" in window && Notification.permission==="default"){
+  Notification.requestPermission();
+}
+
 // SSE Realtime connection
 try {
   const events = new EventSource("/api/events");
@@ -903,7 +1155,13 @@ try {
     try {
       const ev = JSON.parse(e.data);
       if(ev && ev.tool){
-        toast("⚡ ChatGPT vừa gọi tool: " + ev.tool + " (" + ev.action + ")");
+        toast("⚡ ChatGPT vừa gọi: " + ev.tool + " (" + ev.action + ")");
+        if(window.Notification && Notification.permission==="granted" && document.hidden){
+          new Notification("ChatGPT Local Secure", {
+            body: "ChatGPT vừa gọi tool " + ev.tool + " (" + ev.action + ")",
+            icon: "/assets/logo.png"
+          });
+        }
         load();
       }
     } catch {}
