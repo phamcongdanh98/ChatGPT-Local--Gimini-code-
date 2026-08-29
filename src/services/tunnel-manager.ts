@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
-import { buildTunnelCommand, parseTunnelProvider, tunnelEnvironment, type TunnelProvider } from "../cli/tunnel.js";
+import { buildTunnelCommand, ensureNgrokTokenConfig, parseTunnelProvider, tunnelEnvironment, type TunnelProvider } from "../cli/tunnel.js";
 
 export type TunnelState = "stopped" | "starting" | "running" | "stopping" | "failed";
 
@@ -106,6 +106,12 @@ export class TunnelManager {
     }
 
     const provider = parseTunnelProvider(options.provider);
+    if (provider === "ngrok") {
+      const token = options.ngrokToken || process.env.NGROK_AUTHTOKEN;
+      if (token) {
+        await ensureNgrokTokenConfig(token);
+      }
+    }
     const command = buildTunnelCommand(provider, options.port, {
       cloudflareToken: options.cloudflareToken,
       ngrokToken: options.ngrokToken,

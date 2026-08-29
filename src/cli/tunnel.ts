@@ -1,6 +1,25 @@
 import { spawn, type SpawnOptions } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 import "dotenv/config";
+
+export async function ensureNgrokTokenConfig(token: string): Promise<void> {
+  const clean = token.trim();
+  if (!clean) return;
+  try {
+    const configDir = process.platform === "darwin"
+      ? path.join(os.homedir(), "Library/Application Support/ngrok")
+      : process.platform === "win32"
+        ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData/Local"), "ngrok")
+        : path.join(os.homedir(), ".config/ngrok");
+    await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
+    const configPath = path.join(configDir, "ngrok.yml");
+    const content = `version: "3"\nagent:\n  authtoken: ${clean}\n`;
+    await fs.writeFile(configPath, content, { encoding: "utf8", mode: 0o600 });
+  } catch {}
+}
 
 export type TunnelProvider = "pinggy" | "cloudflared" | "ngrok";
 
